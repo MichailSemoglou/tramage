@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Tramage: palette-structure-aware error diffusion dithering"
+type: software
+version: 0.1.0
+date-released: "2026-07-02"
+url: "https://github.com/MichailSemoglou/tramage"
+repository-code: "https://github.com/MichailSemoglou/tramage"
+license: MIT
+authors:
+  - name: "Michail Semoglou"
+    website: "https://qide.studio"
+keywords:
+  - dithering
+  - error diffusion
+  - colour
+  - oklab
+  - palette
+  - halftoning

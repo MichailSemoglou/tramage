@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.DS_Store
+
+# Experiment corpora (large, redistributable; fetched on demand)
+experiments/corpora/
+# Experiment outputs (regenerable from code + corpora)
+experiments/palette_geometry/results/
+experiments/dithering_quality/results/
+experiments/colour_space/results/
+experiments/kb_baseline/results/
+experiments/epsilon_sweep/results/
