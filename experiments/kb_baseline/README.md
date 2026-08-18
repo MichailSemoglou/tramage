@@ -1,6 +1,6 @@
-# Filter-baseline experiment: does shaping substitute for HVS filter design?
+# Filter-baseline experiment: FS vs KB vs DV, with and without shaping
 
-The paper's central claim needs to survive a stronger comparison than plain
+The paper's claim needs to survive stronger comparisons than plain
 Floyd-Steinberg. This experiment runs three filters — naive Floyd-Steinberg
 (FS), the Kolpatzik-Bouman scalar HVS filter (KB, the separable special case
 of Damera-Venkata), and the full matrix-valued Damera-Venkata filter (DV) —
@@ -11,25 +11,49 @@ each with and without palette-structure-aware shaping. Six configurations per
 - **kb-baseline / kb-shaped** — KB scalar HVS filter, without / with shaping.
 - **dv-baseline / dv-shaped** — the matrix-valued DV filter, without / with shaping.
 
-## The headline is substitution, not independence
+## Metric blindness: `noise_L` cannot see what KB/DV do
 
-At small palette sizes, palette-geometry shaping does more than an
-HVS-optimised filter. Per-image means at K=8 (n=24):
+`noise_L` is a per-channel error standard deviation — a spatially unweighted
+statistic. KB (and DV) do not reduce error variance; they **redistribute**
+error energy toward high spatial frequencies and toward rotational symmetry
+(blue noise) where the visual system is less sensitive. A metric that ignores
+spatial structure cannot see that redistribution.
 
-| config | noise_L |
-|---|---|
-| fs-baseline | 0.0907 |
-| kb-baseline | 0.0908 |
-| kb-shaped | 0.0558 |
-| **fs-shaped** | **0.0416** |
+The two spatial metrics we have confirm this on the existing CSV
+(fs-baseline vs kb-baseline, n=24):
 
-**`fs-shaped` beats `kb-baseline` on 24/24 images (mean −0.0492, ~54% lower),
-and beats `kb-shaped` on 24/24 images (mean −0.0142).** Shaping a naive
-filter does the work of an HVS-tuned filter, and more. The practical claim is
-stronger than "shaping is independent of filter choice": *implementers can
-skip filter design* — palette-geometry shaping on plain Floyd-Steinberg
-recovers the benefit of an HVS-optimised filter at the palette sizes where
-shaping matters.
+| K | noise_L | spectral_anisotropy | lowfreq_frac |
+|---|---|---|---|
+| 8 | 0.0907 → 0.0908 | 0.8208 → **0.7434** | 0.0328 → 0.0323 |
+| 16 | 0.0671 → 0.0731 | 0.6267 → **0.4648** | 0.0074 → 0.0161 |
+| 32 | 0.0390 → 0.0480 | 0.5159 → **0.3442** | 0.0048 → 0.0114 |
+| 64 | 0.0226 → 0.0318 | 0.4862 → **0.3370** | 0.0033 → 0.0108 |
+
+- **`spectral_anisotropy` separates cleanly** (KB is more isotropic on
+  15–18/24 images at every K) — the KB filter's blue-noise mechanism is
+  working, and `noise_L` cannot see it.
+- **`noise_L` does not separate** (0.0907 vs 0.0908 at K=8): an HVS filter
+  producing no change on this metric is evidence that the metric is blind,
+  not that the filter is weak.
+- **`lowfreq_frac` goes the wrong way at K ≥ 16** — the approximate opponent
+  transform (`_oklab_to_opponent` treats Oklab L/a/b as RGB-like) degrades the
+  KB filter at large K, which is a property of this implementation, not of the
+  filter design.
+
+**Consequence:** any claim that rests on `noise_L` comparing FS against
+KB/DV is provisional until the re-run produces S-CIELAB ΔE, the one metric
+that applies spatial CSF weighting and can actually see what an HVS filter
+does. S-CIELAB is the arbiter; `noise_L` is not.
+
+## Provisional observation, to be confirmed by S-CIELAB
+
+At K=8 on `noise_L` (per-image means): `fs-shaped` 0.0416 vs `kb-baseline`
+0.0908 and `kb-shaped` 0.0558. That is a large effect (24/24 images), and
+54% is a lot of headroom, so the substitution story — *palette-geometry
+shaping on a naive filter recovers the benefit of an HVS-tuned filter* — may
+hold. But it could shrink or reverse once error is measured with spatial
+weighting, because `noise_L` understates KB by construction. **Do not state
+substitution as the headline until S-CIELAB confirms it.**
 
 ## Regime of interest
 
@@ -37,9 +61,9 @@ Shaping is a **small-to-moderate-K intervention** (K ≤ 64). That is where
 palette geometry is irregular enough for shaping to have purchase; at
 K = 256, error diffusion into 256 colours is barely doing anything for
 anyone (the shaping benefit is 0.0037 of a noise level of ~0.008). The
-interaction ratio is therefore only meaningful where the shaping effect
-(the denominator) is not near zero; absolute interaction is reported
-alongside the ratio throughout.
+interaction ratio is only meaningful where the shaping effect (the
+denominator) is not near zero; absolute interaction is reported alongside
+the ratio throughout.
 
 ## The stronger baselines
 
@@ -48,13 +72,13 @@ alongside the ratio throughout.
   variance under per-channel CSFs. Uses the published coefficients directly.
 - **DV matrix filter** (`tramage.dv_filter`): the full Damera-Venkata matrix
   taps, designed per palette by solving a Yule-Walker system in
-  Poirson-Wandell opponent space (see `dv_filter.py`). This is the exact
-  prior art, not a special case.
+  Poirson-Wandell opponent space. The exact prior art, not a special case.
 
-Both filters run through the same approximate opponent transform
-(`_oklab_to_opponent` treats Oklab L/a/b as RGB-like), a documented
-limitation: the comparison is indicative rather than definitive against a
-faithful linear-RGB pipeline.
+Both filters run through the same approximate opponent transform, a
+documented limitation: the comparison is indicative rather than definitive
+against a faithful linear-RGB pipeline. The same caution applies to DV as to
+KB — evaluated primarily on error variance, DV will be understated for the
+same reason.
 
 ## Disambiguation: this is not Damera-Venkata
 
@@ -88,10 +112,11 @@ python experiments/kb_baseline/analyze_interaction.py   # trend test + per-K TOS
 
 ## Verdict
 
-**Shaping helps on top of every filter, but its benefit is not uniform: at
-K=8 it does more for the naive FS filter than for the tuned filters, and that
-asymmetry is exactly the substitution result. The interaction is monotonic in
-K — one degree of freedom, p = 9×10⁻⁵ — not noise around a null.**
+**Shaping helps on top of every filter, and its benefit is largest where the
+filter is weakest — but the magnitude of that asymmetry is measured with
+`noise_L`, which cannot see what the tuned filters do. The interaction is
+monotonic in K (single-DOF trend p = 9×10⁻⁵); whether it implies substitution
+or merely a metric artifact is decided by S-CIELAB, not by `noise_L`.**
 
 ### The interaction term
 
@@ -100,9 +125,7 @@ degree-of-freedom test avoids the multiplicity of six per-K tests):
 
 - **Primary — trend test.** Mean per-image slope of the FS−KB interaction
   against log₂K: **−0.0030 per doubling, 95% CI [−0.0044, −0.0017],
-  p = 8.9×10⁻⁵**, crossing zero around K ≈ 70. The interaction declines
-  monotonically with K; the crossing is identified by the trend, not as six
-  independent per-K findings.
+  p = 8.9×10⁻⁵**. The interaction declines monotonically with K.
 - **Secondary — per-K TOST** against a pre-specified margin θ = 25% of the
   pooled shaping benefit (90% bootstrap CI, α = 0.05 one-sided). Equivalence
   holds at K=32; it fails elsewhere.
@@ -118,14 +141,20 @@ L-channel noise, per-image (n=24), mean ± 90% CI:
 | 128 | 0.0070 | −0.0024 [−0.0030, −0.0018] | −0.34 [−0.42, −0.26] | not equivalent — KB benefits more |
 | 256 | 0.0037 | −0.0020 [−0.0023, −0.0016] | −0.53 [−0.61, −0.45] | not equivalent — KB benefits more |
 
+The **absolute interaction changes sign between K=16 and K=32** (the quantity
+the per-K table reports). The trend test's slope+p is the single-DOF result
+for the monotonic decline; it does not report its own fitted crossing, because
+a linear-in-log₂K fit is a poor model of the plateauing interaction.
+
 Three things follow:
 
-1. **The interaction is monotonic and flips sign** (trend p = 9×10⁻⁵). At K=8
-   shaping helps the weaker FS filter more; by K≥64 it helps KB more. Largest
-   where palette geometry is most irregular — a mechanistic finding, not a
-   blemish on a null.
+1. **The interaction is monotonic in K** (trend p = 9×10⁻⁵) and changes sign
+   between K=16 and K=32: shaping helps the weaker FS filter more at small K,
+   the KB filter more at large K. Largest where palette geometry is most
+   irregular — a mechanistic finding.
 2. **At K=8 the interaction is 34% [22%, 47%] of the shaping effect** — the
-   same order as the effect, which is precisely the substitution result.
+   same order as the effect. Whether this is substitution or a metric artifact
+   is the S-CIELAB question.
 3. **The large-K negative ratio is a small-denominator artifact.** At K=256
    the main effect is 0.0037 and the interaction −0.0020; both are tiny in
    absolute terms. Absolute interaction is reported alongside the ratio so the
@@ -138,17 +167,16 @@ it.
 
 ### What this changes for the paper
 
-- The headline is **substitution**: at small K, palette-geometry shaping on a
-  naive filter does the work of an HVS-optimised filter, so implementers can
-  skip filter design. This is a stronger, more practical claim than
-  independence.
+- The abstract states the regime, the mechanism, and the factorial design
+  (what palette geometry predicts), and lets the February manuscript carry
+  whichever headline the S-CIELAB data supports. Substitution is not claimed
+  on `noise_L` alone.
 - The shaping × filter interaction is reported as a **single trend test**
-  (monotonic in K, p = 9×10⁻⁵), with per-K TOSTs kept secondary to locate the
-  crossing (K≈70, equivalence at K=32).
-- **DV&E is now run, not deferred.** The matrix-valued DV filter is a baseline
-  (`dv-baseline` / `dv-shaped`); with orthogonality gone, "is this matrix-valued
-  ED under another name" must be answered with data, not the independence
-  argument.
+  (monotonic in K, p = 9×10⁻⁵), with per-K TOSTs secondary. The sign change
+  is between K=16 and K=32 (absolute interaction).
+- **DV&E is run, not deferred.** The matrix-valued DV filter is a baseline
+  (`dv-baseline` / `dv-shaped`), and the same metric-blindness caveat applies
+  to it: `noise_L` will understate DV for the same reason it understates KB.
 - The tone trade-off (K ≥ 128) is stated as a limitation in the paper, not
   only here.
 

@@ -74,26 +74,25 @@ def _pct(a, q):
 def _trend_test(per_image: dict, Ks: list[int]):
     """Single-DOF trend test: mean per-image slope of interaction vs log2(K).
 
-    Returns ``(mean_slope, lo, hi, p, k_cross)``.
+    Returns ``(mean_slope, lo, hi, p)``. The slope and its p-value are the
+    primary result; the zero crossing is read from the per-K absolute
+    interaction (this fit is linear in log2(K), so it is a poor model for the
+    plateauing interaction and its own crossing point is not reported).
     """
     logKs = np.log2(Ks)
-    slopes, intercepts = [], []
+    slopes = []
     for image, by_K in per_image.items():
         ys = [by_K[K] for K in Ks if K in by_K]
         if len(ys) < 2:
             continue
-        slope, intercept = np.polyfit(logKs[: len(ys)], ys, 1)
+        slope = np.polyfit(logKs[: len(ys)], ys, 1)[0]
         slopes.append(slope)
-        intercepts.append(intercept)
     slopes = np.asarray(slopes)
-    intercepts = np.asarray(intercepts)
     mean_slope = float(slopes.mean())
-    mean_intercept = float(intercepts.mean())
     _, p = stats.ttest_1samp(slopes, 0.0)
     lo, hi = stats.t.interval(0.95, len(slopes) - 1,
                               loc=mean_slope, scale=stats.sem(slopes))
-    k_cross = 2.0 ** (-mean_intercept / mean_slope) if abs(mean_slope) > 1e-12 else float("nan")
-    return mean_slope, float(lo), float(hi), float(p), k_cross
+    return mean_slope, float(lo), float(hi), float(p)
 
 
 def main() -> None:
@@ -166,9 +165,10 @@ def main() -> None:
                   f"{ratio:>+7.2f} [{ratio_lo:>+7.2f},{ratio_hi:>+7.2f}] "
                   f"{theta:>7.4f} {p_upper:>6.3f} {p_lower:>6.3f} {'Y' if equiv else 'N':>6}")
 
-        mean_slope, lo, hi, p, k_cross = _trend_test(inter_matrix, Ks)
+        mean_slope, lo, hi, p = _trend_test(inter_matrix, Ks)
         print(f"  PRIMARY trend test: mean per-image slope = {mean_slope:+.4f}/doubling "
-              f"95% CI [{lo:+.4f}, {hi:+.4f}]  p = {p:.3g}  crossing K ~ {k_cross:.1f}")
+              f"95% CI [{lo:+.4f}, {hi:+.4f}]  p = {p:.3g} "
+              f"(zero crossing read from the per-K absolute interaction, not this fit)")
 
     out_path = RESULTS / "interaction_statistics.csv"
     with out_path.open("w", newline="") as fh:

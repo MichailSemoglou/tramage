@@ -25,13 +25,15 @@ collected, not reverse-engineered afterwards.
    relative to unshaped vector Floyd-Steinberg, on Kodak24 and on CQ100.
 2. **Mechanism.** The benefit is driven by reduced low-frequency ("worm")
    error, tracked by `lowfreq_frac` and `spectral_anisotropy`.
-3. **Substitution + trend (the FS/KB factorial).** At small K, palette-
-   geometry shaping on plain Floyd-Steinberg reaches (or beats) the
-   HVS-optimised filters without shaping. The primary test is a single-degree-
-   of-freedom **trend test**: the per-image slope of the FS−KB interaction
-   against log₂K, tested by a one-sample t-test on the 24 per-image slopes.
-   Per-K TOST equivalence tests (θ = 25% of the pooled shaping benefit) are
-   secondary, used only to locate the crossing point.
+3. **Interaction + trend (the FS/KB factorial).** The primary test is a
+   single-degree-of-freedom **trend test**: the per-image slope of the FS−KB
+   interaction against log₂K, tested by a one-sample t-test on the 24 per-image
+   slopes. Per-K TOST equivalence tests (θ = 25% of the pooled shaping benefit)
+   are secondary, used only to locate the sign change. Whether the small-K
+   asymmetry implies *substitution* (shaping on a naive filter recovers the
+   benefit of an HVS-tuned filter) is tested by S-CIELAB ΔE, not by `noise_L`:
+   `noise_L` is spatially unweighted and blind to the filters' energy-
+   redistribution mechanism.
 
 4. **DV (exact prior art).** Shaping still reduces S-CIELAB ΔE on top of the
    full matrix-valued Damera-Venkata filter (`dv-shaped` vs `dv-baseline`).
