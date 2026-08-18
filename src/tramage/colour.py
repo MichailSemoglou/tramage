@@ -17,6 +17,28 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
+from ._constants import (
+    D65_XN as _XN,
+)
+from ._constants import (
+    D65_YN as _YN,
+)
+from ._constants import (
+    D65_ZN as _ZN,
+)
+from ._constants import (
+    EPS_LAB as _EPS_LAB,
+)
+from ._constants import (
+    KAPPA_LAB as _KAPPA_LAB,
+)
+from ._constants import (
+    SRGB_TO_XYZ_D65 as _SRGB_TO_XYZ_D65,
+)
+from ._constants import (
+    XYZ_TO_LINEAR_SRGB as _XYZ_FROM_SRGB_INV,
+)
+
 FloatArray = NDArray[np.float64]
 
 # sRGB (linear) -> LMS, from the Oklab reference implementation.
@@ -105,20 +127,8 @@ def in_gamut(lab: FloatArray, tol: float = 1e-6) -> np.bool_ | NDArray[np.bool_]
 # conversion path exists so the head-to-head in experiments/colour_space/
 # can test whether Oklab -- the package default -- is actually the right
 # choice for palette-structure-aware shaping, rather than asserting it.
-# Standard sRGB -> XYZ matrix for a D65 white point (IEC 61966-2-1).
-_SRGB_TO_XYZ_D65 = np.array([
-    [0.4123908, 0.3575843, 0.1804808],
-    [0.2126390, 0.7151687, 0.0721923],
-    [0.0193308, 0.1191948, 0.9505322],
-])
-_XYZ_FROM_SRGB_INV = np.linalg.inv(_SRGB_TO_XYZ_D65)
-
-# D65 reference white in absolute XYZ (2-degree observer). Used to normalise
-# XYZ before the cube-root; the ratios are what CIELAB is built from.
-_XN, _YN, _ZN = 0.95047, 1.00000, 1.08883
-# CIELAB cube-root threshold: t^3 above (6/29)^3, else (1/3)(29/6)^2 * t + 4/29.
-_EPS_LAB = (6.0 / 29.0) ** 3
-_KAPPA_LAB = (1.0 / 3.0) * (29.0 / 6.0) ** 2
+# (sRGB->XYZ matrix, D65 white point, and CIELAB constants live in
+# tramage._constants and are imported under these names at the top of the file.)
 
 
 def _lab_f(t: FloatArray) -> FloatArray:

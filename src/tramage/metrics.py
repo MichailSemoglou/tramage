@@ -15,7 +15,17 @@ from __future__ import annotations
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from .colour import FloatArray, oklab_to_xyz
+from ._constants import (
+    D65_XN,
+    D65_YN,
+    D65_ZN,
+    OPP_TO_XYZ,
+    SIGMA_CHROM_DEG,
+    SIGMA_LUM_DEG,
+    XYZ_TO_OPP,
+    pixels_per_degree,
+)
+from .colour import FloatArray, _lab_f, oklab_to_xyz
 
 
 def error(dithered: FloatArray, original: FloatArray) -> FloatArray:
@@ -142,62 +152,29 @@ def spectral_anisotropy(
 # separable-filter parameter fits: luminance ~0.0283°, chrominance ~0.116°.
 # These are converted to pixel units using the viewing geometry.
 
-# Poirson & Wandell (1996) opponent matrix, as cited in Zhang & Wandell (1997).
-_XYZ_TO_OPP = np.array([
-    [0.2787, 0.7218, -0.1066],   # O1: luminance
-    [-0.4486, 0.2898, 0.0777],   # O2: red-green
-    [0.0860, -0.5898, 0.5011],   # O3: blue-yellow
-])
-_OPP_TO_XYZ = np.linalg.inv(_XYZ_TO_OPP)
-
-# D65 reference white (2-degree observer). Same values as colour.py.
-_XN_SCI, _YN_SCI, _ZN_SCI = 0.95047, 1.00000, 1.08883
-
-# CIELAB constants.
-_EPS_LAB_SCI = (6.0 / 29.0) ** 3
-_KAPPA_LAB_SCI = (1.0 / 3.0) * (29.0 / 6.0) ** 2
-
-# Default spatial-filter sigmas in degrees of visual angle.
-# From the S-CIELAB separable-filter Gaussian fits.
-_DEFAULT_SIGMA_DEG_LUM = 0.0283
-_DEFAULT_SIGMA_DEG_CHROM = 0.116
+# (Opponent matrix, D65 white point, CIELAB constants, and CSF sigmas live in
+# tramage._constants and are imported under these names at the top of the file.)
 
 
 def _xyz_to_opponent(xyz: FloatArray) -> FloatArray:
     """XYZ D65 → opponent (O1 luminance, O2 rg, O3 yb)."""
-    return xyz @ _XYZ_TO_OPP.T
+    return xyz @ XYZ_TO_OPP.T
 
 
 def _opponent_to_xyz(opp: FloatArray) -> FloatArray:
     """Opponent → XYZ D65."""
-    return opp @ _OPP_TO_XYZ.T
+    return opp @ OPP_TO_XYZ.T
 
 
 def _xyz_to_cielab_per_pixel(xyz: FloatArray) -> FloatArray:
-    """XYZ D65 → CIELAB L*a*b*."""
-    fx = np.where(xyz[..., 0] / _XN_SCI > _EPS_LAB_SCI,
-                  np.cbrt(xyz[..., 0] / _XN_SCI),
-                  _KAPPA_LAB_SCI * xyz[..., 0] / _XN_SCI + 4.0 / 29.0)
-    fy = np.where(xyz[..., 1] / _YN_SCI > _EPS_LAB_SCI,
-                  np.cbrt(xyz[..., 1] / _YN_SCI),
-                  _KAPPA_LAB_SCI * xyz[..., 1] / _YN_SCI + 4.0 / 29.0)
-    fz = np.where(xyz[..., 2] / _ZN_SCI > _EPS_LAB_SCI,
-                  np.cbrt(xyz[..., 2] / _ZN_SCI),
-                  _KAPPA_LAB_SCI * xyz[..., 2] / _ZN_SCI + 4.0 / 29.0)
+    """XYZ D65 → CIELAB L*a*b*, reusing colour._lab_f for the nonlinearity."""
+    fx = _lab_f(xyz[..., 0] / D65_XN)
+    fy = _lab_f(xyz[..., 1] / D65_YN)
+    fz = _lab_f(xyz[..., 2] / D65_ZN)
     L = 116.0 * fy - 16.0
     a = 500.0 * (fx - fy)
     b = 200.0 * (fy - fz)
     return np.stack([L, a, b], axis=-1)
-
-
-def _pixels_per_degree(dpi: float, viewing_distance_cm: float) -> float:
-    """Number of pixels per degree of visual angle at the given geometry.
-
-    One pixel subtends ``atan(2.54 / dpi / viewing_distance_cm)`` radians;
-    the small-angle approximation is used since the angle is below 0.02 rad
-    for any practical display.
-    """
-    return (dpi * viewing_distance_cm) / (2.54 * (180.0 / np.pi))
 
 
 def scielab_de(
@@ -248,10 +225,10 @@ def scielab_de(
     filters to within ~5% on RMS error for images above 64×64 px, and
     they avoid a dependency on the full kernel tables.
     """
-    ppd = _pixels_per_degree(dpi, viewing_distance_cm)
+    ppd = pixels_per_degree(dpi, viewing_distance_cm)
 
-    sigma_lum_px = _DEFAULT_SIGMA_DEG_LUM * ppd
-    sigma_chrom_px = _DEFAULT_SIGMA_DEG_CHROM * ppd
+    sigma_lum_px = SIGMA_LUM_DEG * ppd
+    sigma_chrom_px = SIGMA_CHROM_DEG * ppd
 
     xyz_dithered = oklab_to_xyz(dithered)
     xyz_original = oklab_to_xyz(original)

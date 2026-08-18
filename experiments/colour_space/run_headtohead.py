@@ -11,8 +11,10 @@ running the same Kodak24 dithering pipeline in three configurations:
 
 The metrics are computed in the colour space the dithering was done in, so
 absolute values are not cross-comparable (CIELAB L* is 0-100, Oklab L is
-~0-1). The comparison that matters is the **relative shaping improvement**
-within each space, computed downstream in ``plot_headtohead.py`` as
+~0-1). S-CIELAB ΔE is the exception: it is computed on the rendered RGB for
+every configuration, so it is directly cross-comparable. The comparison that
+matters is the **relative shaping improvement** within each space, computed
+downstream in ``plot_headtohead.py`` as
 ``(metric_baseline - metric_shaped) / metric_baseline``. That ratio is
 unit-free and directly answers "which space gives shaping more purchase?"
 
@@ -35,22 +37,31 @@ import time
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
-from tramage.colour import cielab_to_srgb, srgb_to_cielab, srgb_to_oklab
-from tramage.diffusion import diffuse
-from tramage.metrics import (
-    blurred_tone_error,
-    lowfreq_energy_fraction,
-    noise_std,
-    spectral_anisotropy,
-    systematic_bias,
+from tramage._harness import (
+    corpus_dirs,
+    finalise_csv,
+    images_in,
+    load_done,
+    load_rgb,
+    provenance,
+    score,
 )
+from tramage.colour import cielab_to_srgb, oklab_to_srgb, srgb_to_cielab, srgb_to_oklab
+from tramage.diffusion import diffuse
+from tramage.metrics import scielab_de
 from tramage.palette import extract_palette
 from tramage.shaping import DEFAULT_EPS, global_shaping_matrix
 
 KS: tuple[int, ...] = (8, 16, 32, 64, 128, 256)
 SEED = 0
+
+# eps as a fixed fraction of a palette's largest eigenvalue, for cross-space
+# comparability. DEFAULT_EPS is tuned to Oklab's L~0-1 scale; the 0.05 divisor
+# is a typical Kodak Oklab eigenvalue, so this fraction reproduces DEFAULT_EPS's
+# behaviour in Oklab while staying unit-free for CIELAB (L* 0-100). See
+# _space_relative_eps below.
+_EPS_FRACTION = DEFAULT_EPS / 0.05
 
 HERE = Path(__file__).resolve().parent
 CORPORA = HERE.parent / "corpora"
@@ -62,7 +73,8 @@ FIELDS = [
     "corpus", "image", "K", "config", "eps",
     "bias_norm", "bias_L", "bias_a", "bias_b",
     "noise_L", "noise_a", "noise_b",
-    "tone_error", "lowfreq_frac", "anisotropy",
+    "tone_error", "lowfreq_frac", "anisotropy", "scielab_de",
+    "git_sha", "corpus_sha256",
 ]
 
 # Each configuration is a self-contained pipeline: a forward transform,
@@ -72,56 +84,22 @@ FIELDS = [
 # baseline, cielab shaping against the CIELAB baseline. Comparing across
 # spaces directly would mix Oklab L (~0-1) with CIELAB L* (0-100).
 CONFIGS = ("oklab-baseline", "oklab", "cielab-baseline", "cielab")
+_CONFIG_ORDER = {c: i for i, c in enumerate(CONFIGS)}
 
 
-def _load_done() -> set[tuple[str, int, str]]:
-    if not CSV_PATH.exists():
-        return set()
-    done: set[tuple[str, int, str]] = set()
-    with CSV_PATH.open(newline="") as fh:
-        for row in csv.DictReader(fh):
-            done.add((row["image"], int(row["K"]), row["config"]))
-    return done
+def _done_key(row: dict) -> tuple:
+    """Identity of one trial for resume-skipping: (image, K, config)."""
+    return (row["image"], int(row["K"]), row["config"])
 
 
-def _finalise_csv() -> None:
-    if not CSV_PATH.exists():
-        return
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    for row in rows:
-        key = (row["corpus"], row["image"], int(row["K"]), row["config"])
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(row)
-    unique.sort(key=lambda r: (r["corpus"], r["image"], int(r["K"]),
-                               {"oklab-baseline": 0, "oklab": 1,
-                                "cielab-baseline": 2, "cielab": 3}[r["config"]]))
-    with CSV_PATH.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(unique)
+def _row_key(row: dict) -> tuple:
+    """Identity of one CSV row for dedupe."""
+    return (row["corpus"], row["image"], int(row["K"]), row["config"])
 
 
-def _score(dithered: np.ndarray, original: np.ndarray) -> dict:
-    bias = systematic_bias(dithered, original)
-    noise = noise_std(dithered, original)
-    return {
-        "bias_norm": float(np.linalg.norm(bias)),
-        "bias_L": float(bias[0]), "bias_a": float(bias[1]), "bias_b": float(bias[2]),
-        "noise_L": float(noise[0]), "noise_a": float(noise[1]), "noise_b": float(noise[2]),
-        "tone_error": float(blurred_tone_error(dithered, original)),
-        "lowfreq_frac": float(lowfreq_energy_fraction(dithered, original, channel=0)),
-        "anisotropy": float(spectral_anisotropy(dithered, original, channel=0)),
-    }
-
-
-def _load_rgb(path: Path) -> np.ndarray:
-    img = Image.open(path).convert("RGB")
-    return np.asarray(img, dtype=np.float64) / 255.0
+def _sort_key(row: dict) -> tuple:
+    """Sort key putting configs in their declared order within each (image, K)."""
+    return (row["corpus"], row["image"], int(row["K"]), _CONFIG_ORDER[row["config"]])
 
 
 def _space_relative_eps(palette: np.ndarray) -> float:
@@ -139,7 +117,7 @@ def _space_relative_eps(palette: np.ndarray) -> float:
     (the smallest eigenvalue gets a gain near 0.15, the largest near 0.99).
     """
     _, eigenvalues, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
-    return float(eigenvalues[-1]) * (DEFAULT_EPS / 0.05)
+    return float(eigenvalues[-1]) * _EPS_FRACTION
 
 
 def _run_config(rgb: np.ndarray, K: int, config: str) -> tuple[np.ndarray, np.ndarray, float]:
@@ -181,11 +159,11 @@ def _timing_probe(images: list[Path], n: int = 3) -> float:
     times: list[float] = []
     configs = ["oklab-baseline", "oklab", "cielab-baseline", "cielab"]
     for i in range(n):
-        rgb = _load_rgb(images[i % len(images)])
+        rgb = load_rgb(images[i % len(images)])
         K = [8, 64, 256][i]
         t0 = time.time()
         d, o, _ = _run_config(rgb, K, configs[i])
-        _score(d, o)
+        score(d, o, scielab=False)
         dt = time.time() - t0
         times.append(dt)
         print(f"  probe {i+1}: {configs[i]} K={K}  {dt:.2f}s", flush=True)
@@ -195,22 +173,24 @@ def _timing_probe(images: list[Path], n: int = 3) -> float:
 
 
 def main() -> None:
-    corpora = sorted(d for d in CORPORA.iterdir() if d.is_dir())
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
             "Run experiments/palette_geometry/fetch_kodak.py first."
         )
 
-    done = _load_done()
+    done = load_done(CSV_PATH, _done_key)
     if done:
         print(f"resuming: {len(done)} trials already in CSV, will skip those", flush=True)
 
     all_images: list[Path] = []
     for corpus in corpora:
-        all_images += sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+        all_images += images_in(corpus)
     if not all_images:
         raise SystemExit("no .png/.jpg images found in any corpus")
+
+    prov = provenance(all_images, HERE.parent.parent)
 
     _timing_probe(all_images)
 
@@ -224,13 +204,13 @@ def main() -> None:
     n_new = 0
     try:
         for corpus in corpora:
-            images = sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+            images = images_in(corpus)
             if not images:
                 continue
             print(f"[corpus] {corpus.name}: {len(images)} images", flush=True)
 
             for path in images:
-                rgb = _load_rgb(path)
+                rgb = load_rgb(path)
                 for K in KS:
                     if all((path.name, K, c) in done for c in CONFIGS):
                         continue
@@ -242,7 +222,17 @@ def main() -> None:
                             "corpus": corpus.name, "image": path.name,
                             "K": K, "config": config, "eps": eps_used,
                         }
-                        row.update(_score(dithered, original))
+                        row.update(score(dithered, original, scielab=False))
+                        # S-CIELAB on the rendered RGB, so both colour spaces
+                        # are compared in the same perceptual coordinates.
+                        if config.startswith("oklab"):
+                            dithered_rgb = oklab_to_srgb(dithered)
+                        else:
+                            dithered_rgb = cielab_to_srgb(dithered)
+                        row["scielab_de"] = float(
+                            scielab_de(srgb_to_oklab(dithered_rgb), srgb_to_oklab(rgb))
+                        )
+                        row.update(prov)
                         writer.writerow(row)
                         fh.flush()
                         n_new += 1
@@ -251,7 +241,7 @@ def main() -> None:
     finally:
         fh.close()
 
-    _finalise_csv()
+    finalise_csv(CSV_PATH, FIELDS, _row_key, _sort_key)
     print(f"\n{n_new} new trial(s) added; {n_new + len(done)} total in {CSV_PATH}", flush=True)
 
 

@@ -33,18 +33,16 @@ import csv
 import time
 from pathlib import Path
 
-import numpy as np
-from PIL import Image
-
-from tramage.colour import srgb_to_oklab
-from tramage.diffusion import diffuse
-from tramage.metrics import (
-    blurred_tone_error,
-    lowfreq_energy_fraction,
-    noise_std,
-    spectral_anisotropy,
-    systematic_bias,
+from tramage._harness import (
+    corpus_dirs,
+    finalise_csv,
+    images_in,
+    load_done,
+    load_oklab,
+    provenance,
+    score,
 )
+from tramage.diffusion import diffuse
 from tramage.palette import extract_palette
 from tramage.shaping import DEFAULT_EPS, global_shaping_matrix, per_cell_shaping_matrices
 
@@ -63,63 +61,19 @@ FIELDS = [
     "corpus", "image", "K", "variant", "eps",
     "bias_norm", "bias_L", "bias_a", "bias_b",
     "noise_L", "noise_a", "noise_b",
-    "tone_error", "lowfreq_frac", "anisotropy",
+    "tone_error", "lowfreq_frac", "anisotropy", "scielab_de",
+    "git_sha", "corpus_sha256",
 ]
 
 
-def _load_done() -> set[tuple[str, int, str]]:
-    """Return the set of ``(image, K, variant)`` trials already in the CSV."""
-    if not CSV_PATH.exists():
-        return set()
-    done: set[tuple[str, int, str]] = set()
-    with CSV_PATH.open(newline="") as fh:
-        for row in csv.DictReader(fh):
-            done.add((row["image"], int(row["K"]), row["variant"]))
-    return done
+def _done_key(row: dict) -> tuple:
+    """Identity of one trial for resume-skipping: (image, K, variant)."""
+    return (row["image"], int(row["K"]), row["variant"])
 
 
-def _finalise_csv() -> None:
-    """Dedupe and sort. Idempotent; safe to call repeatedly."""
-    if not CSV_PATH.exists():
-        return
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    for row in rows:
-        key = (row["corpus"], row["image"], int(row["K"]), row["variant"])
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(row)
-    unique.sort(key=lambda r: (r["corpus"], r["image"], int(r["K"]), r["variant"]))
-    with CSV_PATH.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(unique)
-
-
-def _load_oklab(path: Path) -> np.ndarray:
-    img = Image.open(path).convert("RGB")
-    rgb = np.asarray(img, dtype=np.float64) / 255.0
-    return srgb_to_oklab(rgb)
-
-
-def _score(dithered: np.ndarray, original: np.ndarray) -> dict:
-    """Compute every metric for one dithered image against its original.
-
-    Returns the metric fields of one CSV row (caller adds identity fields).
-    """
-    bias = systematic_bias(dithered, original)
-    noise = noise_std(dithered, original)
-    return {
-        "bias_norm": float(np.linalg.norm(bias)),
-        "bias_L": float(bias[0]), "bias_a": float(bias[1]), "bias_b": float(bias[2]),
-        "noise_L": float(noise[0]), "noise_a": float(noise[1]), "noise_b": float(noise[2]),
-        "tone_error": float(blurred_tone_error(dithered, original)),
-        "lowfreq_frac": float(lowfreq_energy_fraction(dithered, original, channel=0)),
-        "anisotropy": float(spectral_anisotropy(dithered, original, channel=0)),
-    }
+def _row_key(row: dict) -> tuple:
+    """Identity of one CSV row for dedupe and sort."""
+    return (row["corpus"], row["image"], int(row["K"]), row["variant"])
 
 
 def _timing_probe(images: list[Path], n: int = 5) -> float:
@@ -128,7 +82,7 @@ def _timing_probe(images: list[Path], n: int = 5) -> float:
     probe_K = [8, 32, 128, 256, 256][:n]
     times: list[float] = []
     for i, K in enumerate(probe_K):
-        oklab = _load_oklab(images[i % len(images)])
+        oklab = load_oklab(images[i % len(images)])
         palette, _ = extract_palette(oklab, n_colours=K, seed=SEED)
         t0 = time.time()
         diffuse(oklab, palette, shaping=None)
@@ -141,23 +95,25 @@ def _timing_probe(images: list[Path], n: int = 5) -> float:
 
 
 def main() -> None:
-    corpora = sorted(d for d in CORPORA.iterdir() if d.is_dir())
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
             "Run experiments/palette_geometry/fetch_kodak.py first."
         )
 
-    done = _load_done()
+    done = load_done(CSV_PATH, _done_key)
     if done:
         print(f"resuming: {len(done)} trials already in CSV, will skip those", flush=True)
 
     # Gather all images once; the probe needs them too.
     all_images: list[Path] = []
     for corpus in corpora:
-        all_images += sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+        all_images += images_in(corpus)
     if not all_images:
         raise SystemExit("no .png/.jpg images found in any corpus")
+
+    prov = provenance(all_images, HERE.parent.parent)
 
     _timing_probe(all_images)
 
@@ -171,13 +127,13 @@ def main() -> None:
     n_new = 0
     try:
         for corpus in corpora:
-            images = sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+            images = images_in(corpus)
             if not images:
                 continue
             print(f"[corpus] {corpus.name}: {len(images)} images", flush=True)
 
             for path in images:
-                oklab = _load_oklab(path)
+                oklab = load_oklab(path)
                 for K in KS:
                     if all((path.name, K, v) in done for v in ("baseline", "global", "cell")):
                         continue
@@ -197,7 +153,8 @@ def main() -> None:
                             "corpus": corpus.name, "image": path.name,
                             "K": K, "variant": variant, "eps": DEFAULT_EPS,
                         }
-                        row.update(_score(dithered, oklab))
+                        row.update(score(dithered, oklab))
+                        row.update(prov)
                         writer.writerow(row)
                         fh.flush()
                         n_new += 1
@@ -206,7 +163,7 @@ def main() -> None:
     finally:
         fh.close()
 
-    _finalise_csv()
+    finalise_csv(CSV_PATH, FIELDS, _row_key)
     print(f"\n{n_new} new trial(s) added; {n_new + len(done)} total in {CSV_PATH}", flush=True)
 
 

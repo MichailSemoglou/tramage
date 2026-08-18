@@ -22,11 +22,12 @@ Run from the repository root, after run_geometry.py::
 
 from __future__ import annotations
 
-import csv
 from collections import defaultdict
 from pathlib import Path
 
 import matplotlib
+
+from tramage._harness import read_rows
 
 matplotlib.use("Agg")
 
@@ -43,15 +44,9 @@ def _load_rows() -> list[dict]:
         raise SystemExit(
             f"{CSV_PATH} not found. Run run_geometry.py first."
         )
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    # Coerce numeric columns once, here, rather than at every use site.
-    numeric = ["K", "seed", "lambda1", "lambda2", "lambda3", "g1", "g2", "g3",
-               "n_flat", "n_partial", "n_real"]
-    for row in rows:
-        for k in numeric:
-            row[k] = float(row[k])
-    return rows
+    numeric = ("K", "seed", "lambda1", "lambda2", "lambda3", "g1", "g2", "g3",
+               "n_flat", "n_partial", "n_real")
+    return read_rows(CSV_PATH, numeric)
 
 
 def plot_degeneracy_by_K(rows: list[dict]) -> None:

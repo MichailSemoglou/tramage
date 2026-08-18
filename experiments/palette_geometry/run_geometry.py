@@ -23,9 +23,8 @@ import csv
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
-from tramage.colour import srgb_to_oklab
+from tramage._harness import corpus_dirs, finalise_csv, images_in, load_done, load_oklab, provenance
 from tramage.palette import _FLAT_GAIN, _REAL_EXTENT_GAIN, eigenspectrum_report, extract_palette
 from tramage.shaping import DEFAULT_EPS
 
@@ -48,7 +47,18 @@ FIELDS = [
     "lambda1", "lambda2", "lambda3",
     "g1", "g2", "g3",
     "n_flat", "n_partial", "n_real",
+    "git_sha", "corpus_sha256",
 ]
+
+
+def _done_key(row: dict) -> tuple:
+    """Identity of one trial for resume-skipping: (image, K, seed)."""
+    return (row["image"], int(row["K"]), int(row["seed"]))
+
+
+def _row_key(row: dict) -> tuple:
+    """Identity of one CSV row for dedupe and sort."""
+    return (row["corpus"], row["image"], int(row["K"]), int(row["seed"]))
 
 
 def _classify(gains: np.ndarray) -> tuple[int, int, int]:
@@ -64,57 +74,8 @@ def _classify(gains: np.ndarray) -> tuple[int, int, int]:
     return n_flat, n_partial, n_real
 
 
-def _load_oklab(path: Path) -> np.ndarray:
-    img = Image.open(path).convert("RGB")
-    rgb = np.asarray(img, dtype=np.float64) / 255.0
-    return srgb_to_oklab(rgb)
-
-
-def _load_done() -> tuple[set[tuple[str, int, int]], list[dict]]:
-    """Return the trials already in the CSV and the full existing rows.
-
-    Lets the run resume after an interruption. The larger K values are
-    expensive (a 256-colour k-means on a 768x512 image takes ~10 s), and
-    a fresh run each time would throw away that work; the run is also
-    short enough that interrupting and resuming later is a realistic
-    workflow, so progress is checkpointed per trial rather than buffered.
-    """
-    if not CSV_PATH.exists():
-        return set(), []
-    done: set[tuple[str, int, int]] = set()
-    rows: list[dict] = []
-    with CSV_PATH.open(newline="") as fh:
-        for row in csv.DictReader(fh):
-            done.add((row["image"], int(row["K"]), int(row["seed"])))
-            rows.append(row)
-    return done, rows
-
-
-def _finalise_csv() -> None:
-    """Dedupe (in case the same trial was written twice across runs) and sort.
-
-    Idempotent; safe to call repeatedly. Sort order matches the run order
-    so successive runs produce a byte-identical CSV.
-    """
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    for row in rows:
-        key = (row["corpus"], row["image"], int(row["K"]), int(row["seed"]))
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(row)
-    unique.sort(key=lambda r: (r["corpus"], r["image"], int(r["K"]), int(r["seed"])))
-    with CSV_PATH.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(unique)
-
-
 def main() -> None:
-    corpora = sorted(d for d in CORPORA.iterdir() if d.is_dir())
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
@@ -122,14 +83,17 @@ def main() -> None:
             "experiments/corpora/."
         )
 
-    done, existing = _load_done()
-    n_existing = len(existing)
+    done = load_done(CSV_PATH, _done_key)
+    n_existing = len(done)
     if n_existing:
         print(f"resuming: {n_existing} trials already in CSV, will skip those", flush=True)
 
     # Open in append mode and write each row as soon as it is computed, so
     # an interruption (timeout, kill, crash) loses at most the single trial
     # in flight, not the whole run. Dedup happens once at the end.
+    all_images = [img for corpus in corpora for img in images_in(corpus)]
+    prov = provenance(all_images, HERE.parent.parent)
+
     is_new_file = not CSV_PATH.exists()
     fh = CSV_PATH.open("a", newline="")
     writer = csv.DictWriter(fh, fieldnames=FIELDS)
@@ -140,7 +104,7 @@ def main() -> None:
     n_new = 0
     try:
         for corpus in corpora:
-            images = sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+            images = images_in(corpus)
             if not images:
                 print(f"[skip] {corpus.name}: no .png/.jpg images", flush=True)
                 continue
@@ -151,7 +115,7 @@ def main() -> None:
                 if already == len(KS) * len(SEEDS):
                     print(f"  {path.name}: already complete, skipping", flush=True)
                     continue
-                oklab = _load_oklab(path)
+                oklab = load_oklab(path)
                 for K in KS:
                     for seed in SEEDS:
                         if (path.name, K, seed) in done:
@@ -159,7 +123,7 @@ def main() -> None:
                         palette, _ = extract_palette(oklab, n_colours=K, seed=seed)
                         report = eigenspectrum_report(palette, eps=DEFAULT_EPS)
                         n_flat, n_partial, n_real = _classify(report.gains)
-                        writer.writerow({
+                        row = {
                             "corpus": corpus.name,
                             "image": path.name,
                             "K": K,
@@ -174,7 +138,9 @@ def main() -> None:
                             "n_flat": n_flat,
                             "n_partial": n_partial,
                             "n_real": n_real,
-                        })
+                        }
+                        row.update(prov)
+                        writer.writerow(row)
                         fh.flush()
                         n_new += 1
                 print(f"  {path.name}: done {len(KS)} K x {len(SEEDS)} seeds "
@@ -182,7 +148,7 @@ def main() -> None:
     finally:
         fh.close()
 
-    _finalise_csv()
+    finalise_csv(CSV_PATH, FIELDS, _row_key)
     print(f"\n{n_new} new trial(s) added; {n_new + n_existing} total in {CSV_PATH}", flush=True)
 
 

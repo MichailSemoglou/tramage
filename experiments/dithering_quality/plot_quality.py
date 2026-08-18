@@ -29,6 +29,8 @@ from pathlib import Path
 
 import matplotlib
 
+from tramage._harness import QUALITY_NUMERIC_FIELDS, percentile, read_rows
+
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
@@ -45,26 +47,16 @@ METRICS = [
     ("noise_L", "L-channel noise (std of error)", False),  # lower is better
     ("tone_error", "blurred tone error (Oklab dE)", False),
     ("lowfreq_frac", "low-frequency error fraction", False),
+    ("scielab_de", "S-CIELAB ΔE (perceptual)", False),
 ]
 
 
 def _load_quality() -> list[dict]:
     if not QUALITY_CSV.exists():
         raise SystemExit(f"{QUALITY_CSV} not found. Run run_quality.py first.")
-    with QUALITY_CSV.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    for row in rows:
-        for k in ("K", "eps", "bias_norm", "bias_L", "bias_a", "bias_b",
-                  "noise_L", "noise_a", "noise_b", "tone_error",
-                  "lowfreq_frac", "anisotropy"):
-            row[k] = float(row[k])
-    return rows
+    return read_rows(QUALITY_CSV, QUALITY_NUMERIC_FIELDS)
 
 
-def _percentile(arr: np.ndarray, p: float) -> float:
-    if len(arr) == 0:
-        return float("nan")
-    return float(np.percentile(arr, p))
 
 
 def plot_metrics_vs_K(rows: list[dict]) -> None:
@@ -81,8 +73,8 @@ def plot_metrics_vs_K(rows: list[dict]) -> None:
                     if int(row["K"]) == K and row["variant"] == variant
                 ])
                 medians.append(np.median(vals))
-                p25s.append(_percentile(vals, 25))
-                p75s.append(_percentile(vals, 75))
+                p25s.append(percentile(vals, 25))
+                p75s.append(percentile(vals, 75))
             xs = [str(K) for K in Ks]
             ax.plot(xs, medians, marker="o", color=VARIANT_COLORS[variant],
                     label=variant, linewidth=1.8)

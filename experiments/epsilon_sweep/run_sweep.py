@@ -29,7 +29,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from tramage.colour import oklab_to_srgb, srgb_to_oklab
+from tramage._harness import make_test_image
+from tramage.colour import srgb_to_oklab
 from tramage.diffusion import diffuse
 from tramage.metrics import blurred_tone_error, noise_std, scielab_de
 from tramage.palette import extract_palette
@@ -46,21 +47,11 @@ N_EPS = 40
 FIELDS = ["eps", "noise_L", "tone_error", "scielab_de"]
 
 
-def _make_test_image(height: int = 256, width: int = 256) -> np.ndarray:
-    """A synthetic gradient with an off-axis blob, same design as gallery."""
-    yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
-    xn, yn = xx / (width - 1), yy / (height - 1)
-    img = np.zeros((height, width, 3))
-    img[..., 0] = 0.40 + 0.30 * xn
-    img[..., 1] = -0.08 + 0.16 * yn
-    blob = np.exp(-(((xn - 0.5) ** 2 + (yn - 0.5) ** 2) / (2 * 0.18 ** 2)))
-    img[..., 2] = 0.02 + 0.09 * blob
-    return srgb_to_oklab(np.clip(oklab_to_srgb(img), 0, 1))
 
 
 def _load_image(path: Path | None) -> np.ndarray:
     if path is None:
-        return _make_test_image()
+        return make_test_image()
     rgb = np.asarray(Image.open(path).convert("RGB"), dtype=np.float64) / 255.0
     return srgb_to_oklab(rgb)
 

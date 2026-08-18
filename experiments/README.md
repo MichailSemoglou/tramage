@@ -69,6 +69,29 @@ short: Oklab gives shaping roughly double the noise-reduction purchase
 of CIELAB (52–59% vs 12–31% at K=8–64) and wins on 23/24 images at every
 K — the package default is corroborated by corpus evidence.
 
+## CQ100 dithering-quality run (done)
+
+`cq100_quality/` replicates the Kodak dithering-quality experiment on the
+CQ100 corpus (Celebi & Perez-Delgado 2023, JEI 32(3), 033019): 100 images
+across 8 categories (animals, food, objects, people, places, plants,
+vehicles, miscellaneous), CC BY 4.0, all 768×512 or 512×768 PNG. Dataset
+must be downloaded manually from https://data.mendeley.com/datasets/vw5ys9hfxw
+and extracted to `experiments/corpora/cq100/`. Then:
+
+    python experiments/cq100_quality/fetch_cq100.py   # confirms images present
+    python experiments/cq100_quality/run_cq100.py     # 1800-trial corpus run
+    python experiments/cq100_quality/plot_cq100.py    # metrics-vs-K + gain-vs-geometry
+
+Results (27 July 2026): global shaping reduces L-channel noise by 22–41%
+across K, winning on 100/100 images at every K. Unlike the Kodak24 run, no
+tone-accuracy trade-off appears at any K — global beats baseline on blurred
+tone error at every palette size. Low-frequency (worm) energy is halved.
+Per-cell beats global on raw noise at K ≥ 16 but loses on tone and worms,
+strengthening the Kodak conclusion that per-cell does not earn its
+complexity. The 100% win rate on a 100-image corpus with category diversity
+substantially strengthens the paper's central claim relative to the
+single-corpus Kodak24 result.
+
 ## Damera-Venkata baseline (done, scalar KB scope)
 
 `kb_baseline/` tests whether palette-structure-aware shaping still helps

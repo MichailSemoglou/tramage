@@ -21,14 +21,11 @@ Run from the repository root, after run_headtohead.py::
 
 from __future__ import annotations
 
-import csv
-from collections import defaultdict
-
-import csv
-from collections import defaultdict
 from pathlib import Path
 
 import matplotlib
+
+from tramage._harness import QUALITY_NUMERIC_FIELDS, percentile, read_rows
 
 matplotlib.use("Agg")
 
@@ -51,24 +48,16 @@ METRICS = [
     ("noise_L", "L-channel noise"),
     ("tone_error", "blurred tone error"),
     ("lowfreq_frac", "low-frequency error fraction"),
+    ("scielab_de", "S-CIELAB ΔE (on RGB, cross-comparable)"),
 ]
 
 
 def _load() -> list[dict]:
     if not CSV_PATH.exists():
         raise SystemExit(f"{CSV_PATH} not found. Run run_headtohead.py first.")
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    for row in rows:
-        for k in ("K", "eps", "bias_norm", "bias_L", "bias_a", "bias_b",
-                  "noise_L", "noise_a", "noise_b", "tone_error",
-                  "lowfreq_frac", "anisotropy"):
-            row[k] = float(row[k])
-    return rows
+    return read_rows(CSV_PATH, QUALITY_NUMERIC_FIELDS)
 
 
-def _percentile(arr: np.ndarray, p: float) -> float:
-    return float(np.percentile(arr, p)) if len(arr) else float("nan")
 
 
 def plot_relative_improvement(rows: list[dict]) -> None:
@@ -80,6 +69,8 @@ def plot_relative_improvement(rows: list[dict]) -> None:
     CIELAB L* (0-100).
     """
     Ks = sorted({int(r["K"]) for r in rows})
+    by_key = {(r["image"], int(r["K"]), r["config"]): r for r in rows}
+    images = sorted({r["image"] for r in rows})
 
     fig, axes = plt.subplots(1, len(METRICS), figsize=(14, 4.6))
     for ax, (metric, label) in zip(axes, METRICS):
@@ -90,17 +81,18 @@ def plot_relative_improvement(rows: list[dict]) -> None:
             medians, p25s, p75s = [], [], []
             for K in Ks:
                 improvements = []
-                for image in sorted({r["image"] for r in rows}):
-                    base = next((r[metric] for r in rows if r["image"] == image
-                                 and int(r["K"]) == K and r["config"] == base_c), None)
-                    shaped = next((r[metric] for r in rows if r["image"] == image
-                                   and int(r["K"]) == K and r["config"] == space.lower()), None)
-                    if base is None or shaped is None or base <= 0:
+                for image in images:
+                    base_row = by_key.get((image, K, base_c))
+                    shaped_row = by_key.get((image, K, space.lower()))
+                    if base_row is None or shaped_row is None:
+                        continue
+                    base, shaped = base_row[metric], shaped_row[metric]
+                    if base <= 0:
                         continue
                     improvements.append((base - shaped) / base)
                 medians.append(np.median(improvements) if improvements else float("nan"))
-                p25s.append(_percentile(np.array(improvements), 25))
-                p75s.append(_percentile(np.array(improvements), 75))
+                p25s.append(percentile(np.array(improvements), 25))
+                p75s.append(percentile(np.array(improvements), 75))
             xs = [str(K) for K in Ks]
             ax.plot(xs, medians, marker="o", color=color, label=f"{space} shaping", linewidth=1.8)
             ax.fill_between(xs, p25s, p75s, color=color, alpha=0.15)

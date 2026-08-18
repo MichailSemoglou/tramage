@@ -1,15 +1,16 @@
-"""KB baseline experiment: does shaping help against a stronger filter?
+"""Filter baseline experiment: shaping vs HVS-optimised filters.
 
-Runs four configurations on each (image, K):
+Six configurations per (image, K) — a 3-filter x baseline/shaped design:
 
-- ``fs-baseline``:  Floyd-Steinberg in Oklab, no shaping.
-- ``fs-shaped``:    FS in Oklab with global palette shaping.
-- ``kb-baseline``:  Kolpatzik-Bouman scalar filter in opponent space, no shaping.
-- ``kb-shaped``:    KB filter with global palette shaping applied on top.
+- ``fs-baseline`` / ``fs-shaped``: Floyd-Steinberg, without / with shaping.
+- ``kb-baseline`` / ``kb-shaped``: Kolpatzik-Bouman scalar HVS filter (the
+  separable special case of Damera-Venkata), without / with shaping.
+- ``dv-baseline`` / ``dv-shaped``: the full matrix-valued Damera-Venkata
+  filter, without / with shaping.
 
-The fourth configuration is the load-bearing one. If ``kb-shaped`` beats
-``kb-baseline``, the paper's claim generalises beyond plain FS. If not,
-the claim is FS-specific and the paper narrows.
+The FS/KB pair is a 2x2 factorial whose interaction is analysed in
+``analyze_interaction.py``; the DV pair is the exact-prior-art comparison —
+does shaping still help on top of the matrix-valued DV filter itself?
 
 Crash-safe (append-per-trial, dedupe at end). Same pattern as the other
 harnesses.
@@ -26,18 +27,19 @@ import time
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
-from tramage.colour import srgb_to_oklab
-from tramage.diffusion import diffuse
-from tramage.kb_filter import kb_diffuse, kb_filters
-from tramage.metrics import (
-    blurred_tone_error,
-    lowfreq_energy_fraction,
-    noise_std,
-    spectral_anisotropy,
-    systematic_bias,
+from tramage._harness import (
+    corpus_dirs,
+    finalise_csv,
+    images_in,
+    load_done,
+    load_oklab,
+    provenance,
+    score,
 )
+from tramage.diffusion import diffuse
+from tramage.dv_filter import dv_diffuse, dv_filters
+from tramage.kb_filter import kb_diffuse
 from tramage.palette import extract_palette
 from tramage.shaping import DEFAULT_EPS, global_shaping_matrix
 
@@ -54,64 +56,36 @@ FIELDS = [
     "corpus", "image", "K", "config", "eps",
     "bias_norm", "bias_L", "bias_a", "bias_b",
     "noise_L", "noise_a", "noise_b",
-    "tone_error", "lowfreq_frac", "anisotropy",
+    "tone_error", "lowfreq_frac", "anisotropy", "scielab_de",
+    "git_sha", "corpus_sha256",
 ]
 
-CONFIGS = ("fs-baseline", "fs-shaped", "kb-baseline", "kb-shaped")
+CONFIGS = ("fs-baseline", "fs-shaped", "kb-baseline", "kb-shaped", "dv-baseline", "dv-shaped")
+_CONFIG_ORDER = {c: i for i, c in enumerate(CONFIGS)}
 
 
-def _load_done() -> set[tuple[str, int, str]]:
-    if not CSV_PATH.exists():
-        return set()
-    done: set[tuple[str, int, str]] = set()
-    with CSV_PATH.open(newline="") as fh:
-        for row in csv.DictReader(fh):
-            done.add((row["image"], int(row["K"]), row["config"]))
-    return done
+def _done_key(row: dict) -> tuple:
+    """Identity of one trial for resume-skipping: (image, K, config)."""
+    return (row["image"], int(row["K"]), row["config"])
 
 
-def _finalise_csv() -> None:
-    if not CSV_PATH.exists():
-        return
-    with CSV_PATH.open(newline="") as fh:
-        rows = list(csv.DictReader(fh))
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    order = {c: i for i, c in enumerate(CONFIGS)}
-    for row in rows:
-        key = (row["corpus"], row["image"], int(row["K"]), row["config"])
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(row)
-    unique.sort(key=lambda r: (r["corpus"], r["image"], int(r["K"]),
-                               order.get(r["config"], 99)))
-    with CSV_PATH.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(unique)
+def _row_key(row: dict) -> tuple:
+    """Identity of one CSV row for dedupe."""
+    return (row["corpus"], row["image"], int(row["K"]), row["config"])
 
 
-def _score(dithered: np.ndarray, original: np.ndarray) -> dict:
-    bias = systematic_bias(dithered, original)
-    noise = noise_std(dithered, original)
-    return {
-        "bias_norm": float(np.linalg.norm(bias)),
-        "bias_L": float(bias[0]), "bias_a": float(bias[1]), "bias_b": float(bias[2]),
-        "noise_L": float(noise[0]), "noise_a": float(noise[1]), "noise_b": float(noise[2]),
-        "tone_error": float(blurred_tone_error(dithered, original)),
-        "lowfreq_frac": float(lowfreq_energy_fraction(dithered, original, channel=0)),
-        "anisotropy": float(spectral_anisotropy(dithered, original, channel=0)),
-    }
+def _sort_key(row: dict) -> tuple:
+    """Sort key putting configs in their declared order within each (image, K)."""
+    return (row["corpus"], row["image"], int(row["K"]), _CONFIG_ORDER.get(row["config"], 99))
 
 
-def _load_oklab(path: Path) -> np.ndarray:
-    img = Image.open(path).convert("RGB")
-    rgb = np.asarray(img, dtype=np.float64) / 255.0
-    return srgb_to_oklab(rgb)
-
-
-def _run_config(oklab: np.ndarray, palette: np.ndarray, M: np.ndarray, config: str) -> np.ndarray:
+def _run_config(
+    oklab: np.ndarray,
+    palette: np.ndarray,
+    M: np.ndarray,
+    config: str,
+    dv_filts=None,
+) -> np.ndarray:
     """Return the dithered image for one configuration."""
     if config == "fs-baseline":
         d, _ = diffuse(oklab, palette, shaping=None)
@@ -125,43 +99,52 @@ def _run_config(oklab: np.ndarray, palette: np.ndarray, M: np.ndarray, config: s
     if config == "kb-shaped":
         d, _ = kb_diffuse(oklab, palette, shaping=M)
         return d
+    if config == "dv-baseline":
+        d, _ = dv_diffuse(oklab, palette, filters=dv_filts)
+        return d
+    if config == "dv-shaped":
+        d, _ = dv_diffuse(oklab, palette, filters=dv_filts, shaping=M)
+        return d
     raise ValueError(f"unknown config {config!r}")
 
 
-def _timing_probe(images: list[Path], n: int = 4) -> float:
+def _timing_probe(images: list[Path], n: int = 6) -> float:
     print(f"timing probe: {n} dithers...", flush=True)
-    configs = ["fs-baseline", "kb-baseline", "fs-shaped", "kb-shaped"]
+    configs = list(CONFIGS)
     times: list[float] = []
     for i in range(n):
-        oklab = _load_oklab(images[i % len(images)])
+        oklab = load_oklab(images[i % len(images)])
         palette, _ = extract_palette(oklab, n_colours=16, seed=SEED)
         M, _, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
+        dv_filts = dv_filters(palette)
         t0 = time.time()
-        _run_config(oklab, palette, M, configs[i])
+        _run_config(oklab, palette, M, configs[i], dv_filts)
         times.append(time.time() - t0)
         print(f"  probe {i+1}: {configs[i]}  {times[-1]:.2f}s", flush=True)
     mean = sum(times) / len(times)
-    print(f"mean per-trial: {mean:.2f}s  -> 576 trials est. {mean*576/60:.1f} min", flush=True)
+    print(f"mean per-trial: {mean:.2f}s  -> 864 trials est. {mean*864/60:.1f} min", flush=True)
     return mean
 
 
 def main() -> None:
-    corpora = sorted(d for d in CORPORA.iterdir() if d.is_dir())
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
             "Run experiments/palette_geometry/fetch_kodak.py first."
         )
 
-    done = _load_done()
+    done = load_done(CSV_PATH, _done_key)
     if done:
         print(f"resuming: {len(done)} trials already in CSV, will skip those", flush=True)
 
     all_images: list[Path] = []
     for corpus in corpora:
-        all_images += sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+        all_images += images_in(corpus)
     if not all_images:
         raise SystemExit("no .png/.jpg images found in any corpus")
+
+    prov = provenance(all_images, HERE.parent.parent)
 
     _timing_probe(all_images)
 
@@ -175,27 +158,32 @@ def main() -> None:
     n_new = 0
     try:
         for corpus in corpora:
-            images = sorted(corpus.glob("*.png")) + sorted(corpus.glob("*.jpg"))
+            images = images_in(corpus)
             if not images:
                 continue
             print(f"[corpus] {corpus.name}: {len(images)} images", flush=True)
 
             for path in images:
-                oklab = _load_oklab(path)
+                oklab = load_oklab(path)
                 for K in KS:
                     if all((path.name, K, c) in done for c in CONFIGS):
                         continue
                     palette, _ = extract_palette(oklab, n_colours=K, seed=SEED)
                     M, _, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
+                    dv_filts = None
+                    if any((path.name, K, c) not in done
+                           for c in ("dv-baseline", "dv-shaped")):
+                        dv_filts = dv_filters(palette)
                     for config in CONFIGS:
                         if (path.name, K, config) in done:
                             continue
-                        dithered = _run_config(oklab, palette, M, config)
+                        dithered = _run_config(oklab, palette, M, config, dv_filts)
                         row = {
                             "corpus": corpus.name, "image": path.name,
                             "K": K, "config": config, "eps": DEFAULT_EPS,
                         }
-                        row.update(_score(dithered, oklab))
+                        row.update(score(dithered, oklab))
+                        row.update(prov)
                         writer.writerow(row)
                         fh.flush()
                         n_new += 1
@@ -204,7 +192,7 @@ def main() -> None:
     finally:
         fh.close()
 
-    _finalise_csv()
+    finalise_csv(CSV_PATH, FIELDS, _row_key, _sort_key)
     print(f"\n{n_new} new trial(s) added; {n_new + len(done)} total in {CSV_PATH}", flush=True)
 
 

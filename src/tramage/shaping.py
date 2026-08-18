@@ -28,6 +28,8 @@ Two variants are provided:
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -116,7 +118,6 @@ def per_cell_shaping_matrices(
         raise ValueError(f"k must be >= 1, got {k!r}")
     k = min(k, n - 1)
     if k < 3:
-        import warnings
         warnings.warn(
             f"per-cell shaping with only {k} neighbour(s) per colour "
             f"(palette has {n} colours) will produce low-rank local "

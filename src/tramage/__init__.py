@@ -18,6 +18,7 @@ from .colour import (
     srgb_to_xyz,
 )
 from .diffusion import DEFAULT_WEIGHTS, diffuse
+from .dv_filter import DVFilters, dv_diffuse, dv_filters
 from .kb_filter import KBFilters, kb_diffuse, kb_filters
 from .metrics import (
     blurred_tone_error,
@@ -68,6 +69,9 @@ __all__ = [
     "kb_filters",
     "kb_diffuse",
     "KBFilters",
+    "dv_filters",
+    "dv_diffuse",
+    "DVFilters",
     "scielab_de",
     "blurred_tone_error",
     "lowfreq_energy_fraction",
