@@ -42,12 +42,14 @@ The two spatial metrics we have confirm this on the existing CSV
   a low-frequency floor (~0.010–0.012) that does not collapse as K grows,
   while FS's low-frequency error falls to 0.0025. Verified per-image: KB's
   bias stays ~0.001–0.002 across K while FS's falls to ~0.0004.
-- **DV is currently worse, and that is a separate problem.** At K=32 on
-  kodim01, DV gives `lowfreq_frac = 0.0862` (34× FS) and `bias_norm = 0.00328`
-  (8× FS) even though its taps sum to the identity (DC-conserving). That is a
-  filter-design divergence in `dv_filter`, not the shared opponent
-  approximation (KB and DV use different opponent matrices). DV is not yet a
-  usable baseline; it must be fixed before it can be the primary comparison.
+- **DV is currently worse, and the obvious causes are ruled out.** At K=32 on
+  kodim01 (single image), DV gives `lowfreq_frac = 0.0862` (34× FS) and
+  `bias_norm = 0.00328` (8× FS). Three checks clear the suspects: **zero clip
+  events** during filter design (the ±1e3/±1e6 clipping never fires), an
+  **exact opponent round-trip** (distortion 0.0), and **DC-conserving taps**
+  with a clean constant-image output (error 0.0). The remaining suspect is the
+  synthetic-training filter design not generalising to real-image spectra.
+  DV is disabled in the run (`RUN_DV = False`) until resolved.
 
 **Consequence:** any claim that rests on `noise_L` comparing FS against
 KB/DV is provisional until the re-run produces S-CIELAB ΔE, the one metric
@@ -63,6 +65,38 @@ shaping on a naive filter recovers the benefit of an HVS-tuned filter* — may
 hold. But it could shrink or reverse once error is measured with spatial
 weighting, because `noise_L` understates KB by construction. **Do not state
 substitution as the headline until S-CIELAB confirms it.**
+
+## KB's DC leak: a publishable finding, and shaping compensates for it
+
+Kolpatzik–Bouman drop the DC constraint deliberately, and this leaves a
+low-frequency error floor that does not decay with palette size. Per-image
+means over the full 24-image corpus (`lowfreq_frac`, lower is better):
+
+| K | kb-baseline | kb-shaped | fs-baseline |
+|---|---|---|---|
+| 8 | 0.0323 | 0.0229 | 0.0328 |
+| 16 | 0.0161 | 0.0049 | 0.0074 |
+| 32 | 0.0114 | 0.0029 | 0.0048 |
+| 64 | 0.0108 | 0.0020 | 0.0033 |
+
+Two things follow:
+
+1. **The crossing at K=16 is where DC conservation starts to matter more than
+   HVS weighting.** Below K=16 both filters are dominated by large quantisation
+   error; from K=16 up, FS's low-frequency error collapses (it conserves DC)
+   while KB's floor stays near 0.011. That is a concrete, quantified limitation
+   of a widely cited HVS-optimised filter — a case where optimising against a
+   perceptual model introduces a systematic artifact the model does not
+   penalise.
+
+2. **Shaping compensates for the DC leak rather than inheriting it.** At
+   K=16–64, `kb-shaped` cuts the floor from ~0.011 to ~0.002–0.005, at or below
+   FS-baseline's level. The shaping matrix damps the palette's degenerate
+   direction, which is where the leaked DC error accumulates. Shaping repairs a
+   documented limitation of an HVS-optimised filter.
+
+(These are `noise_L`-based low-frequency fractions, not S-CIELAB; the re-run
+will confirm whether the same holds under spatial CSF weighting.)
 
 ## Regime of interest
 
@@ -106,15 +140,15 @@ additionally spatially adaptive where a DV&E matrix is fixed for the image.
 | Corpus | Kodak24 (24 images, 768×512) |
 | Palette sizes | K ∈ {8, 16, 32, 64, 128, 256} |
 | Seed | 0 |
-| Configs per trial | 6 (3 filters × baseline/shaped) |
-| Total trials | 864 (24 × 6 × 6) |
+| Configs per trial | 4 (FS/KB × baseline/shaped; DV disabled) |
+| Total trials | 576 (24 × 6 × 4) |
 | `eps` | `DEFAULT_EPS = 0.02²` |
 | Diffusion | FS, KB scalar, DV matrix — all serpentine |
 
 ## Reproducing
 
 ```bash
-python experiments/kb_baseline/run_kbbaseline.py        # ~30 min
+python experiments/kb_baseline/run_kbbaseline.py        # ~25 min
 python experiments/kb_baseline/plot_kbbaseline.py       # metrics + relative + interaction PNGs
 python experiments/kb_baseline/analyze_interaction.py   # trend test + per-K TOST
 ```

@@ -1,16 +1,18 @@
 """Filter baseline experiment: shaping vs HVS-optimised filters.
 
-Six configurations per (image, K) — a 3-filter x baseline/shaped design:
+Four active configurations per (image, K) — an FS/KB x baseline/shaped design:
 
 - ``fs-baseline`` / ``fs-shaped``: Floyd-Steinberg, without / with shaping.
 - ``kb-baseline`` / ``kb-shaped``: Kolpatzik-Bouman scalar HVS filter (the
   separable special case of Damera-Venkata), without / with shaping.
-- ``dv-baseline`` / ``dv-shaped``: the full matrix-valued Damera-Venkata
-  filter, without / with shaping.
 
 The FS/KB pair is a 2x2 factorial whose interaction is analysed in
-``analyze_interaction.py``; the DV pair is the exact-prior-art comparison —
-does shaping still help on top of the matrix-valued DV filter itself?
+``analyze_interaction.py``.
+
+The matrix-valued Damera-Venkata filter (``dv-baseline`` / ``dv-shaped``) is
+disabled pending a design fix: 0 clip events, an exact opponent round-trip,
+and DC-conserving taps, yet high bias and low-frequency error on real images
+(see ROADMAP). Set ``RUN_DV = True`` to re-enable.
 
 Crash-safe (append-per-trial, dedupe at end). Same pattern as the other
 harnesses.
@@ -60,7 +62,13 @@ FIELDS = [
     "git_sha", "corpus_sha256",
 ]
 
-CONFIGS = ("fs-baseline", "fs-shaped", "kb-baseline", "kb-shaped", "dv-baseline", "dv-shaped")
+# DV (matrix-valued Damera-Venkata) is disabled until its design is fixed:
+# 0 clip events, exact opponent round-trip, DC-conserving taps, clean
+# constant-image output, yet high bias/lowfreq on real images (see ROADMAP).
+RUN_DV = False
+CONFIGS = (
+    "fs-baseline", "fs-shaped", "kb-baseline", "kb-shaped",
+) + (("dv-baseline", "dv-shaped") if RUN_DV else ())
 _CONFIG_ORDER = {c: i for i, c in enumerate(CONFIGS)}
 
 
@@ -116,7 +124,7 @@ def _timing_probe(images: list[Path], n: int = 6) -> float:
         oklab = load_oklab(images[i % len(images)])
         palette, _ = extract_palette(oklab, n_colours=16, seed=SEED)
         M, _, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
-        dv_filts = dv_filters(palette)
+        dv_filts = dv_filters(palette) if RUN_DV else None
         t0 = time.time()
         _run_config(oklab, palette, M, configs[i], dv_filts)
         times.append(time.time() - t0)
@@ -171,8 +179,8 @@ def main() -> None:
                     palette, _ = extract_palette(oklab, n_colours=K, seed=SEED)
                     M, _, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
                     dv_filts = None
-                    if any((path.name, K, c) not in done
-                           for c in ("dv-baseline", "dv-shaped")):
+                    if RUN_DV and any((path.name, K, c) not in done
+                                      for c in ("dv-baseline", "dv-shaped")):
                         dv_filts = dv_filters(palette)
                     for config in CONFIGS:
                         if (path.name, K, config) in done:
