@@ -35,10 +35,19 @@ The two spatial metrics we have confirm this on the existing CSV
 - **`noise_L` does not separate** (0.0907 vs 0.0908 at K=8): an HVS filter
   producing no change on this metric is evidence that the metric is blind,
   not that the filter is weak.
-- **`lowfreq_frac` goes the wrong way at K ≥ 16** — the approximate opponent
-  transform (`_oklab_to_opponent` treats Oklab L/a/b as RGB-like) degrades the
-  KB filter at large K, which is a property of this implementation, not of the
-  filter design.
+- **`lowfreq_frac` goes the wrong way at K ≥ 16, and the cause is DC
+  non-conservation, not the opponent approximation.** The published KB
+  luminance taps sum to 0.9443 (kolpatzik1992 deliberately drop the DC
+  constraint), leaking ~5.6% of luminance error per pixel. That leak produces
+  a low-frequency floor (~0.010–0.012) that does not collapse as K grows,
+  while FS's low-frequency error falls to 0.0025. Verified per-image: KB's
+  bias stays ~0.001–0.002 across K while FS's falls to ~0.0004.
+- **DV is currently worse, and that is a separate problem.** At K=32 on
+  kodim01, DV gives `lowfreq_frac = 0.0862` (34× FS) and `bias_norm = 0.00328`
+  (8× FS) even though its taps sum to the identity (DC-conserving). That is a
+  filter-design divergence in `dv_filter`, not the shared opponent
+  approximation (KB and DV use different opponent matrices). DV is not yet a
+  usable baseline; it must be fixed before it can be the primary comparison.
 
 **Consequence:** any claim that rests on `noise_L` comparing FS against
 KB/DV is provisional until the re-run produces S-CIELAB ΔE, the one metric

@@ -3,11 +3,12 @@
 The FS/KB pair is a 2x2 factorial. This script reports the interaction two
 ways, with the trend test as the PRIMARY analysis:
 
-- **Primary — trend test.** A single-degree-of-freedom test: for each image,
-  the slope of the interaction against log2(K); a one-sample t-test on the
-  per-image slopes. This tests the monotonic-K claim in one step and sidesteps
-  the multiplicity of six per-K tests. Reports the slope, 95% CI, p-value, and
-  the K at which the fitted interaction crosses zero.
+- **Primary — trend test.** A **Jonckheere-Terpstra** ordered-trend test
+  across K, which tests a monotonic decline without committing to a functional
+  form (a linear-in-log₂(K) fit is a poor model of the plateauing interaction,
+  so its slope and p-value would inherit that misspecification). Reports the JT
+  statistic and its one-sided p; the mean per-image linear slope is reported as
+  a descriptive effect size only.
 - **Secondary — per-K TOST.** A two-one-sided-tests equivalence test per K
   against a pre-specified margin, theta = 0.25 x the pooled shaping benefit,
   with a 90% bootstrap CI. Used to locate the crossing point, not as six
@@ -72,27 +73,39 @@ def _pct(a, q):
 
 
 def _trend_test(per_image: dict, Ks: list[int]):
-    """Single-DOF trend test: mean per-image slope of interaction vs log2(K).
+    """Jonckheere-Terpstra ordered-trend test of a monotonic decline in K.
 
-    Returns ``(mean_slope, lo, hi, p)``. The slope and its p-value are the
-    primary result; the zero crossing is read from the per-K absolute
-    interaction (this fit is linear in log2(K), so it is a poor model for the
-    plateauing interaction and its own crossing point is not reported).
+    Treats each (image, K) interaction as one observation grouped by K and
+    tests the alternative that the interaction decreases with K. No parametric
+    shape is assumed. Returns ``(jt, z, p, mean_slope)``; ``mean_slope`` is the
+    mean per-image linear-in-log2(K) slope, reported only as a descriptive
+    effect size (no p-value, since that fit is a poor model of the plateauing
+    interaction).
     """
+    groups = []
+    for K in Ks:
+        vals = [per_image[img][K] for img in per_image if K in per_image[img]]
+        groups.append(np.asarray(vals))
+    # Decreasing trend: count pairs (x at earlier K, y at later K) with x > y.
+    jt = 0
+    for i in range(len(groups)):
+        for j in range(i + 1, len(groups)):
+            for x in groups[i]:
+                jt += int((x > groups[j]).sum())
+    nk = np.array([g.size for g in groups])
+    N = int(nk.sum())
+    E = (N * N - int((nk * nk).sum())) / 4.0
+    V = (N * N * (2 * N + 3) - int((nk * nk * (2 * nk + 3)).sum())) / 72.0
+    z = (jt - E) / np.sqrt(V)
+    p = float(stats.norm.sf(z))  # one-sided: decreasing trend
     logKs = np.log2(Ks)
     slopes = []
-    for image, by_K in per_image.items():
+    for img, by_K in per_image.items():
         ys = [by_K[K] for K in Ks if K in by_K]
-        if len(ys) < 2:
-            continue
-        slope = np.polyfit(logKs[: len(ys)], ys, 1)[0]
-        slopes.append(slope)
-    slopes = np.asarray(slopes)
-    mean_slope = float(slopes.mean())
-    _, p = stats.ttest_1samp(slopes, 0.0)
-    lo, hi = stats.t.interval(0.95, len(slopes) - 1,
-                              loc=mean_slope, scale=stats.sem(slopes))
-    return mean_slope, float(lo), float(hi), float(p)
+        if len(ys) >= 2:
+            slopes.append(np.polyfit(logKs[: len(ys)], ys, 1)[0])
+    mean_slope = float(np.mean(slopes)) if slopes else float("nan")
+    return int(jt), float(z), p, mean_slope
 
 
 def main() -> None:
@@ -165,10 +178,10 @@ def main() -> None:
                   f"{ratio:>+7.2f} [{ratio_lo:>+7.2f},{ratio_hi:>+7.2f}] "
                   f"{theta:>7.4f} {p_upper:>6.3f} {p_lower:>6.3f} {'Y' if equiv else 'N':>6}")
 
-        mean_slope, lo, hi, p = _trend_test(inter_matrix, Ks)
-        print(f"  PRIMARY trend test: mean per-image slope = {mean_slope:+.4f}/doubling "
-              f"95% CI [{lo:+.4f}, {hi:+.4f}]  p = {p:.3g} "
-              f"(zero crossing read from the per-K absolute interaction, not this fit)")
+        jt, z, p, mean_slope = _trend_test(inter_matrix, Ks)
+        print(f"  PRIMARY trend test (Jonckheere-Terpstra): JT = {jt}  z = {z:+.2f}  "
+              f"one-sided p = {p:.3g} (decreasing in K); "
+              f"descriptive slope = {mean_slope:+.4f}/doubling")
 
     out_path = RESULTS / "interaction_statistics.csv"
     with out_path.open("w", newline="") as fh:

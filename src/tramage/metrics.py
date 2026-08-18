@@ -111,8 +111,10 @@ def spectral_anisotropy(
     orientation within the mid-frequency band; directional artefacts (from
     serpentine scanning bias, for example) show up as an uneven angular
     profile. Returns the coefficient of variation of spectral power across
-    `bins` angular bins, so 0 is perfectly isotropic and larger values are
-    more directional.
+    `bins` angular bins: 0 means every orientation carries equal power, and 1
+    means the angular standard deviation equals the angular mean (strongly
+    directional). Values can exceed 1 for highly peaked spectra; the scale is
+    relative, not normalised to a fixed maximum.
     """
     e = error(dithered, original)[..., channel]
     e = e - e.mean()
