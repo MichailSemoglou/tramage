@@ -115,6 +115,28 @@ post-shaping lowfreq is palette-determined, not image-determined. Eigenvalue
 spread and nearest-neighbour spacing are reported as exploratory checks only,
 not as pre-specified predictors.
 
+## Fixed-palette experiment (pre-specified readout)
+
+A fixed palette is applied across many images to decouple palette geometry
+from image content (the per-image-palette confound). Design: 10 seed palettes
+spanning the K=8 condition-number range (3.1 to 1.6e5, including a badly
+conditioned one), at K=8 and K=16, each applied to all 124 corpus images with
+global shaping; post-shaping `lowfreq_frac` is recorded.
+
+**Readout: the intraclass correlation** ICC(1) = between-palette variance /
+total variance (one-way random-effects, palettes as groups), computed
+separately for K=8 and K=16. Pre-specified interpretation:
+
+- **ICC > 0.5** — strong: the post-shaping level is largely palette-determined.
+- **0.2 ≤ ICC ≤ 0.5** — partial: a palette component exists but is not dominant.
+- **ICC < 0.2** — null: no meaningful palette-determined level.
+
+**Mismatch confound (checked, not assumed).** With a fixed palette, images
+differ in how well the palette fits them, so within-palette variance partly
+reflects palette-image mismatch. If the within-palette variance is large, the
+first alternative is mismatch; check it by testing whether high-variance images
+under a palette are those with high baseline error under that palette.
+
 ## Provenance
 
 Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
