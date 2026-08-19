@@ -65,6 +65,26 @@ claim, Oklab metrics are the mechanism). Disagreement changes the paper's
 structure and is the more interesting result; it must be known first.
 Implemented in `experiments/analyze_rank_agreement.py`.
 
+## Contingent interpretation — the K=8 outcome
+
+The small-K (K=8) shaping benefit currently rests on `noise_L`, which cannot
+see spatial structure; both spatially aware metrics (`lowfreq_frac` +45%,
+`spectral_anisotropy` +0.34) say shaping *hurts* at K=8. S-CIELAB is spatially
+weighted, so the K=8 result is genuinely in question. Both outcomes are
+pre-specified:
+
+- **If S-CIELAB does not confirm shaping at K=8:** the paper relocates to a
+  moderate-K intervention (K=16–64); K=8 becomes a boundary finding — below
+  some palette size the redistributed error has nowhere to go that the eye
+  does not see. The 45% worm cost is already named, so this is a finding, not
+  a concession.
+- **If S-CIELAB confirms shaping at K=8:** the perceptual gain from reduced
+  colour error outweighs the added spatial structure — worth a paragraph, as
+  that trade is the interesting claim.
+
+The rank agreement (`scielab_de` vs `noise_L`) is the first result read from
+the re-run; it decides which of the two papers is being written.
+
 ## Provenance
 
 Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
