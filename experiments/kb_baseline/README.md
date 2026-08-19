@@ -66,34 +66,44 @@ hold. But it could shrink or reverse once error is measured with spatial
 weighting, because `noise_L` understates KB by construction. **Do not state
 substitution as the headline until S-CIELAB confirms it.**
 
-## KB's DC leak: a publishable finding, and shaping compensates for it
+## KB's DC leak, and what shaping does to it — two regimes
 
-Kolpatzik–Bouman drop the DC constraint deliberately, and this leaves a
-low-frequency error floor that does not decay with palette size. Per-image
-means over the full 24-image corpus (`lowfreq_frac`, lower is better):
+The full four-cell `lowfreq_frac` table (per-image means, n=24) splits into
+two regimes:
 
-| K | kb-baseline | kb-shaped | fs-baseline |
-|---|---|---|---|
-| 8 | 0.0323 | 0.0229 | 0.0328 |
-| 16 | 0.0161 | 0.0049 | 0.0074 |
-| 32 | 0.0114 | 0.0029 | 0.0048 |
-| 64 | 0.0108 | 0.0020 | 0.0033 |
+| K | kb-baseline | kb-shaped | fs-baseline | fs-shaped |
+|---|---|---|---|---|
+| 8 | 0.0323 | 0.0229 | 0.0328 | 0.0474 |
+| 16 | 0.0161 | 0.0049 | 0.0074 | 0.0100 |
+| 32 | 0.0114 | 0.0029 | 0.0048 | 0.0051 |
+| 64 | 0.0108 | 0.0020 | 0.0033 | 0.0025 |
 
-Two things follow:
+**K ≥ 16 — shaping repairs a genuine KB-specific excess.** The KB excess
+(`kb-baseline − fs-baseline`) is +0.0067 to +0.0087, and after shaping the gap
+(`kb-shaped − fs-shaped`) closes to −0.0005 to −0.0052 (KB at or below FS).
+The interaction `(kb_b − fs_b) − (kb_s − fs_s)` is positive on 23–24/24 images.
 
-1. **The crossing at K=16 is where DC conservation starts to matter more than
-   HVS weighting.** Below K=16 both filters are dominated by large quantisation
-   error; from K=16 up, FS's low-frequency error collapses (it conserves DC)
-   while KB's floor stays near 0.011. That is a concrete, quantified limitation
-   of a widely cited HVS-optimised filter — a case where optimising against a
-   perceptual model introduces a systematic artifact the model does not
-   penalise.
+**K = 8 — there is no excess to repair; the interaction is differential harm.**
+The KB excess is −0.0005 (KB and FS start identical on lowfreq). The
+interaction there comes from `fs-shaped` being 45% *worse* than `fs-baseline`
+(0.0474 vs 0.0328) while `kb-shaped` improves (0.0229 vs 0.0323). So at K=8 the
+mechanism is not "shaping repairs KB"; it is "shaping damages FS and does not
+damage KB." Two different findings, reported separately.
 
-2. **Shaping compensates for the DC leak rather than inheriting it.** At
-   K=16–64, `kb-shaped` cuts the floor from ~0.011 to ~0.002–0.005, at or below
-   FS-baseline's level. The shaping matrix damps the palette's degenerate
-   direction, which is where the leaked DC error accumulates. Shaping repairs a
-   documented limitation of an HVS-optimised filter.
+Why shaping raises lowfreq on FS but not KB at small K: the shaping matrix
+damps the palette's degenerate direction, and the redistributed error has to
+go somewhere. KB's HVS taps have high-frequency emphasis, so they absorb it
+into high-frequency structure (KB lowfreq *falls*). FS has no such emphasis,
+so the redistributed error becomes low-frequency worms (FS lowfreq *rises*).
+`spectral_anisotropy` rises for **both** arms (KB +0.67, FS +0.34 at K=8), so
+the divergence is in frequency, not isotropy — both shaped arms get more
+directional; they differ in whether that structure sits at low or high
+frequency.
+
+**Limitation to state in the paper:** at K=8, shaping raises FS's
+low-frequency (worm) error by 45% (0.0328 → 0.0474). That is a real cost in
+the headline regime and must appear in the limitations with the number, not
+folded into the already-named tone-noise trade-off.
 
 (These are `noise_L`-based low-frequency fractions, not S-CIELAB; the re-run
 will confirm whether the same holds under spatial CSF weighting.)

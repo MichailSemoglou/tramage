@@ -116,9 +116,11 @@ def _run_config(
     raise ValueError(f"unknown config {config!r}")
 
 
-def _timing_probe(images: list[Path], n: int = 6) -> float:
-    print(f"timing probe: {n} dithers...", flush=True)
+def _timing_probe(images: list[Path], n: int | None = None) -> float:
     configs = list(CONFIGS)
+    if n is None:
+        n = len(configs)
+    print(f"timing probe: {n} dithers...", flush=True)
     times: list[float] = []
     for i in range(n):
         oklab = load_oklab(images[i % len(images)])
