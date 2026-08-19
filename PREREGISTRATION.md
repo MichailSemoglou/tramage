@@ -137,6 +137,22 @@ reflects palette-image mismatch. If the within-palette variance is large, the
 first alternative is mismatch; check it by testing whether high-variance images
 under a palette are those with high baseline error under that palette.
 
+**Readout refinement (pre-specified).** The condition numbers span five orders
+of magnitude with a single outlier (yasaka_pagoda, cond 1.6e5; the next is
+2.8e3). ICC is computed on the **nine well-conditioned palettes (cond < 3e3)**,
+and the pagoda palette is reported separately as a case, so one point does not
+carry the leverage on the pooled ICC. The case reading: the thesis predicts the
+badly-conditioned palette produces the *most* palette-determined behaviour, i.e.
+the lowest within-palette variance — the mechanism visible in a single case,
+shown in a figure rather than an ICC number.
+
+**Heteroscedasticity check.** ICC(1) assumes homoscedastic within-palette
+variance. Check whether within-palette variance varies systematically with the
+palette condition number; if well-conditioned palettes leave image content
+intact while badly-conditioned ones flatten it, a single ICC averages two
+regimes and describes neither, so report per-palette within variance against
+condition number.
+
 ## Provenance
 
 Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
