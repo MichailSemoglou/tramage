@@ -173,7 +173,7 @@ def _timing_probe(images: list[Path], n: int = 3) -> float:
 
 
 def main() -> None:
-    corpora = corpus_dirs(CORPORA)
+    corpora = [d for d in corpus_dirs(CORPORA) if d.name == 'kodak']
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
