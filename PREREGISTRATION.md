@@ -85,6 +85,22 @@ pre-specified:
 The rank agreement (`scielab_de` vs `noise_L`) is the first result read from
 the re-run; it decides which of the two papers is being written.
 
+## Subgroup analysis — Kodak vs CQ100
+
+The two corpora are analysed jointly and as pre-specified subgroups (Kodak24,
+24 images; CQ100, 100 images). Shaping is hypothesised to impose a
+palette-determined low-frequency level that pulls both corpora toward a common
+value, so the subgroup analyses are:
+
+- S-CIELAB shaping benefit, per corpus.
+- The lowfreq response: across-image variance collapse and the
+  (global − baseline)-vs-baseline regression, per corpus.
+- The KB DC-leak floor and the shaping-compensation interaction, per corpus.
+
+This replaces any "independent replication" framing: the re-run analysed one
+124-image set (a `corpus_dirs` bug combined the corpora), so the subsets are a
+subgroup analysis, not independent confirmation.
+
 ## Provenance
 
 Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
