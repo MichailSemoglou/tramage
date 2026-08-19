@@ -101,6 +101,20 @@ This replaces any "independent replication" framing: the re-run analysed one
 124-image set (a `corpus_dirs` bug combined the corpora), so the subsets are a
 subgroup analysis, not independent confirmation.
 
+## Palette-geometry regression (pre-specified)
+
+The positive form of the "palette-determined" claim. **Pre-specified
+predictor: condition number** of the palette covariance (λ_max/λ_min), the
+scalar that directly expresses how badly conditioned a palette is — the
+thesis's central quantity.
+
+Test: regress post-shaping `lowfreq_frac` on log(condition number); then add
+image index as a factor and compare R². If image identity contributes no
+explanatory power beyond the condition number, the positive form holds:
+post-shaping lowfreq is palette-determined, not image-determined. Eigenvalue
+spread and nearest-neighbour spacing are reported as exploratory checks only,
+not as pre-specified predictors.
+
 ## Provenance
 
 Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
