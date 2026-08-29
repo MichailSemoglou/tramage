@@ -90,12 +90,18 @@ def _timing_probe(images: list[Path], n: int = 5) -> float:
         times.append(dt)
         print(f"  probe {i+1}: K={K}  {dt:.2f}s", flush=True)
     mean = sum(times) / len(times)
-    print(f"mean per-dither: {mean:.2f}s  -> 432 trials est. {mean*432/60:.1f} min", flush=True)
+    n_trials = len(images) * 6 * 3  # K values x variants
+    est_min = mean * n_trials / 60
+    print(f"mean per-dither: {mean:.2f}s  -> {n_trials} trials est. {est_min:.1f} min", flush=True)
     return mean
 
 
 def main() -> None:
-    corpora = [d for d in corpus_dirs(CORPORA) if d.name == 'kodak']
+    # The paper's corpus is Kodak24 + CQ100 (124 images): this experiment's
+    # README configuration table and the 2232-row CSV it cites cover both,
+    # so the run covers both. (The per-corpus filter exists for the
+    # cq100_quality replicate, which adds a category column.)
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "

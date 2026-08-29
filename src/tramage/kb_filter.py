@@ -13,7 +13,8 @@ reused the same filters unchanged in their universal-palette pipeline.
 
 This module uses the **published coefficient values** from kolpatzik1992
 Table 1 (their first-order linear-predictor filters, designed for a
-40 cm viewing distance at 100 dpi, mean luminance 11 cd/m^2) rather than
+40 cm viewing distance at a 0.0317 deg/pixel sampling rate -- 31.5 pixels
+per degree, i.e. ≈115 dpi at 40 cm; mean luminance 11 cd/m^2) rather than
 re-deriving them from the Yule-Walker solve. The from-scratch derivation
 is numerically delicate: the Nasanen luminance CSF has ~1e56 dynamic
 range across the design grid, which makes the autocorrelation matrix
@@ -64,11 +65,13 @@ def kb_filters() -> KBFilters:
     Coefficients are from kolpatzik1992 Table 1 ("1st order LP" rows,
     non-separable luminance and chrominance filters), in the FS causal
     support order ((0,1), (1,-1), (1,0), (1,1)). These were designed for
-    a 40 cm viewing distance at 100 dpi (sampling rate 31.5 cycles/degree)
-    and mean luminance 11 cd/m^2. Note kolpatzik1992's filters do **not**
-    sum to 1.0 -- they explicitly drop the DC-preservation constraint to
-    allow better spectral shaping (their Sec 2.2); the small DC error is
-    a documented property of the method, not a bug.
+    a 40 cm viewing distance at a 0.0317 deg/pixel sampling rate (31.5
+    pixels per degree, ≈115 dpi at 40 cm -- the paper's "31.5 cycles/deg"
+    denotes the sample rate, not the Nyquist rate) and mean luminance
+    11 cd/m^2. Note kolpatzik1992's filters do **not** sum to 1.0 -- they
+    explicitly drop the DC-preservation constraint to allow better spectral
+    shaping (their Sec 2.2); the small DC error is a documented property of
+    the method, not a bug.
     """
     # From kolpatzik1992 Table 1. Columns are g(0,1), g(1,-1), g(1,0), g(1,1)
     # in the FS support order this package uses.

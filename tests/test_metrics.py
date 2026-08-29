@@ -168,3 +168,83 @@ def test_scielab_de_dpi_scaling():
     # At 200 DPI the same pixel grid subtends a smaller visual angle,
     # so the noise is finer and perceptually less visible.
     assert de_high_dpi < de_low_dpi
+
+
+def test_scielab_de_flat_fields_match_cie76_both_filter_paths():
+    """Flat colour pairs must return exactly CIE76: the filters are
+    DC-preserving, so spatial filtering is identity on flat fields, in both
+    the tabulated-kernel and Gaussian-approximation paths."""
+    from tramage import srgb_to_cielab, srgb_to_oklab
+    rgb0 = np.full((32, 40, 3), (0.8, 0.3, 0.5))
+    rgb1 = np.full((32, 40, 3), (0.2, 0.6, 0.4))
+    img0, img1 = srgb_to_oklab(rgb0), srgb_to_oklab(rgb1)
+    expected = float(
+        np.linalg.norm(srgb_to_cielab(rgb0)[0, 0] - srgb_to_cielab(rgb1)[0, 0])
+    )
+    for filters in ("zhang1997", "gaussian"):
+        assert np.isclose(scielab_de(img1, img0, filters=filters), expected, rtol=1e-6)
+
+
+def test_scielab_kernels_unit_dc_and_luminance_surround():
+    """The tabulated kernels are DC-preserving; only the luminance kernel
+    has a negative bandpass surround — the published signature of the
+    Zhang & Wandell (1997) filters."""
+    from tramage.metrics import _scielab_kernels
+    lum, rg, by = _scielab_kernels(100.0, 40.0)
+    for kernel in (lum, rg, by):
+        assert np.isclose(kernel.sum(), 1.0)
+    assert lum.min() < 0.0
+    assert rg.min() >= 0.0 and by.min() >= 0.0
+    # Support scales with each channel's widest lobe: 4.336° >> 0.494° > 0.386°.
+    assert lum.shape[0] > rg.shape[0] > by.shape[0]
+
+
+def test_scielab_zhang1997_matches_per_lobe_reference():
+    """The FFT kernel path must agree with applying each published Gaussian
+    lobe directly (unit-DC gaussian_filter per lobe, weighted sum) on the
+    opponent image — an independent construction of the same filters."""
+    from scipy.ndimage import gaussian_filter
+
+    from tramage import srgb_to_oklab
+    from tramage._constants import (
+        SCIELAB_BY_SPREADS_DEG,
+        SCIELAB_BY_WEIGHTS,
+        SCIELAB_LUM_SPREADS_DEG,
+        SCIELAB_LUM_WEIGHTS,
+        SCIELAB_RG_SPREADS_DEG,
+        SCIELAB_RG_WEIGHTS,
+        pixels_per_degree,
+    )
+    from tramage.colour import oklab_to_xyz
+    from tramage.metrics import _filter_opponent, _xyz_to_opponent
+
+    rng = np.random.default_rng(40)
+    img = srgb_to_oklab(rng.uniform(0, 1, size=(48, 48, 3)))
+    opp = _xyz_to_opponent(oklab_to_xyz(img))
+    ppd = pixels_per_degree(100.0, 40.0)
+    reference = np.stack([
+        sum(
+            w * gaussian_filter(opp[..., c], spread * ppd)
+            for w, spread in zip(weights, spreads)
+        ) / sum(weights)
+        for c, (weights, spreads) in enumerate((
+            (SCIELAB_LUM_WEIGHTS, SCIELAB_LUM_SPREADS_DEG),
+            (SCIELAB_RG_WEIGHTS, SCIELAB_RG_SPREADS_DEG),
+            (SCIELAB_BY_WEIGHTS, SCIELAB_BY_SPREADS_DEG),
+        ))
+    ], axis=-1)
+    got = _filter_opponent(opp, 100.0, 40.0, "zhang1997")
+    # Agreement is to ~1e-6, not machine epsilon: the two paths truncate the
+    # wide luminance lobe (sigma ~119 px on this 48 px image) differently at
+    # the borders. A real plumbing error (axis swap, dropped lobe, bad
+    # normalisation) would show up at O(0.01-1), orders above this bound.
+    assert np.allclose(got, reference, atol=1e-5)
+
+
+def test_scielab_de_unknown_filters_raises():
+    import pytest
+
+    from tramage import srgb_to_oklab
+    img = srgb_to_oklab(np.full((8, 8, 3), 0.5))
+    with pytest.raises(ValueError, match="unknown filters"):
+        scielab_de(img, img, filters="boxcar")

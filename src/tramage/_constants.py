@@ -37,8 +37,23 @@ XYZ_TO_OPP: np.ndarray = np.array([
 ])
 OPP_TO_XYZ: np.ndarray = np.linalg.inv(XYZ_TO_OPP)
 
-# S-CIELAB separable-filter sigmas in degrees of visual angle, from the
-# published Gaussian fits (luminance ~0.0283 deg, chrominance ~0.116 deg).
+# S-CIELAB spatial-filter parameters (Zhang & Wandell 1997, Appendix A).
+# Each opponent channel's pre-filter is a weighted sum of unit-volume 2D
+# Gaussians with these spreads (degrees of visual angle), the composite
+# normalised to unit DC gain. The luminance filter's negative wide lobe
+# gives the bandpass surround of the luminance CSF.
+SCIELAB_LUM_WEIGHTS = (0.921, 0.105, -0.108)
+SCIELAB_LUM_SPREADS_DEG = (0.0283, 0.133, 4.336)
+SCIELAB_RG_WEIGHTS = (0.531, 0.330)
+SCIELAB_RG_SPREADS_DEG = (0.0392, 0.494)
+SCIELAB_BY_WEIGHTS = (0.488, 0.371)
+SCIELAB_BY_SPREADS_DEG = (0.0536, 0.386)
+
+# Legacy single-Gaussian approximation of the S-CIELAB filters: luminance
+# keeps only the narrowest published lobe; chrominance collapses both
+# channels to one shared spread. Retained for the ``filters="gaussian"``
+# comparison path in ``metrics.scielab_de`` and for the (disabled) DV
+# filter design in ``dv_filter``.
 SIGMA_LUM_DEG = 0.0283
 SIGMA_CHROM_DEG = 0.116
 

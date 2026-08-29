@@ -12,14 +12,24 @@ image, both in Oklab, shape ``(H, W, 3)``.
 
 from __future__ import annotations
 
+import math
+from functools import lru_cache
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
+from scipy.signal import fftconvolve
 
 from ._constants import (
     D65_XN,
     D65_YN,
     D65_ZN,
     OPP_TO_XYZ,
+    SCIELAB_BY_SPREADS_DEG,
+    SCIELAB_BY_WEIGHTS,
+    SCIELAB_LUM_SPREADS_DEG,
+    SCIELAB_LUM_WEIGHTS,
+    SCIELAB_RG_SPREADS_DEG,
+    SCIELAB_RG_WEIGHTS,
     SIGMA_CHROM_DEG,
     SIGMA_LUM_DEG,
     XYZ_TO_OPP,
@@ -145,17 +155,22 @@ def spectral_anisotropy(
 # The implementation uses:
 #   - The Poirson & Wandell (1996) pattern-colour separable opponent matrix
 #     to convert XYZ → opponent (luminance O1, red-green O2, blue-yellow O3).
-#   - Gaussian approximations of the S-CIELAB spatial filters, with
-#     channel-specific sigmas calibrated to the contrast sensitivity
-#     functions at the given viewing distance and DPI.
+#   - The tabulated S-CIELAB spatial filters (Zhang & Wandell 1997,
+#     Appendix A): per opponent channel, a weighted sum of unit-volume 2D
+#     Gaussians with the published spreads, each lobe normalised to unit
+#     sum and the composite normalised to unit DC gain. The luminance
+#     filter's third lobe carries a negative weight, giving the bandpass
+#     surround of the luminance CSF.
 #   - Standard CIELAB ΔE (CIE76) on the filtered images.
 #
-# Default sigmas in degrees of visual angle come from the S-CIELAB
-# separable-filter parameter fits: luminance ~0.0283°, chrominance ~0.116°.
-# These are converted to pixel units using the viewing geometry.
+# A single-Gaussian approximation of the filters (luminance: the narrowest
+# published lobe only; chrominance: one shared spread, dropping the
+# red-green/blue-yellow distinction) is retained as ``filters="gaussian"``
+# for comparison with earlier runs; it is not the metric the paper reports.
 
-# (Opponent matrix, D65 white point, CIELAB constants, and CSF sigmas live in
-# tramage._constants and are imported under these names at the top of the file.)
+# (Opponent matrix, D65 white point, CIELAB constants, and the filter
+# parameters live in tramage._constants and are imported at the top of the
+# file.)
 
 
 def _xyz_to_opponent(xyz: FloatArray) -> FloatArray:
@@ -179,6 +194,80 @@ def _xyz_to_cielab_per_pixel(xyz: FloatArray) -> FloatArray:
     return np.stack([L, a, b], axis=-1)
 
 
+def _gaussian_lobe(sigma_px: float, half: int) -> FloatArray:
+    """Unit-sum 2D Gaussian of pixel sigma `sigma_px` on a (2*half+1)² grid."""
+    ax = np.arange(-half, half + 1, dtype=np.float64)
+    yy, xx = np.meshgrid(ax, ax, indexing="ij")
+    lobe = np.exp(-(yy**2 + xx**2) / (2.0 * sigma_px**2))
+    return lobe / lobe.sum()
+
+
+@lru_cache(maxsize=8)
+def _scielab_kernels(dpi: float, viewing_distance_cm: float) -> tuple[FloatArray, ...]:
+    """The three tabulated S-CIELAB opponent filters as 2D kernels.
+
+    Built from the published weights and spreads (Zhang & Wandell 1997,
+    Appendix A) sampled on the pixel grid implied by the viewing geometry.
+    Support is ±4σ of each channel's widest lobe. Cached: the kernels
+    depend only on the viewing geometry, not on the image.
+    """
+    ppd = pixels_per_degree(dpi, viewing_distance_cm)
+    kernels = []
+    for weights, spreads_deg in (
+        (SCIELAB_LUM_WEIGHTS, SCIELAB_LUM_SPREADS_DEG),
+        (SCIELAB_RG_WEIGHTS, SCIELAB_RG_SPREADS_DEG),
+        (SCIELAB_BY_WEIGHTS, SCIELAB_BY_SPREADS_DEG),
+    ):
+        sigmas_px = [spread * ppd for spread in spreads_deg]
+        half = int(math.ceil(4.0 * max(sigmas_px)))
+        kernel = np.zeros((2 * half + 1, 2 * half + 1), dtype=np.float64)
+        for weight, sigma_px in zip(weights, sigmas_px):
+            kernel += weight * _gaussian_lobe(sigma_px, half)
+        kernel /= kernel.sum()
+        kernels.append(kernel)
+    return tuple(kernels)
+
+
+def _convolve_symmetric(image: FloatArray, kernel: FloatArray) -> FloatArray:
+    """Convolve a 2D image with `kernel`, symmetric (edge-repeating) borders.
+
+    This is the ``mode="reflect"`` convention of :func:`scipy.ndimage.
+    gaussian_filter` (which the Gaussian-approximation path uses), computed
+    by FFT: the luminance kernel's wide surround (σ ≈ 119 px at the default
+    geometry) makes the separable direct form needlessly slow.
+    """
+    pad_h, pad_w = kernel.shape[0] // 2, kernel.shape[1] // 2
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode="symmetric")
+    return fftconvolve(padded, kernel, mode="valid")
+
+
+def _filter_opponent(
+    opp: FloatArray,
+    dpi: float,
+    viewing_distance_cm: float,
+    filters: str,
+) -> FloatArray:
+    """Apply the per-channel S-CIELAB spatial pre-filters to an opponent image."""
+    if filters == "zhang1997":
+        kernels = _scielab_kernels(dpi, viewing_distance_cm)
+        return np.stack(
+            [_convolve_symmetric(opp[..., c], kernels[c]) for c in range(3)],
+            axis=-1,
+        )
+    if filters == "gaussian":
+        ppd = pixels_per_degree(dpi, viewing_distance_cm)
+        sigma_lum_px = SIGMA_LUM_DEG * ppd
+        sigma_chrom_px = SIGMA_CHROM_DEG * ppd
+        return np.stack([
+            gaussian_filter(opp[..., 0], sigma_lum_px),
+            gaussian_filter(opp[..., 1], sigma_chrom_px),
+            gaussian_filter(opp[..., 2], sigma_chrom_px),
+        ], axis=-1)
+    raise ValueError(
+        f"unknown filters {filters!r}: expected 'zhang1997' or 'gaussian'"
+    )
+
+
 def scielab_de(
     dithered: FloatArray,
     original: FloatArray,
@@ -186,14 +275,16 @@ def scielab_de(
     viewing_distance_cm: float = 40.0,
     *,
     full: bool = False,
+    filters: str = "zhang1997",
 ) -> float | dict[str, float]:
     """S-CIELAB ΔE between dithered and original images (both in Oklab).
 
-    Applies opponent-space spatial pre-filtering that approximates the
-    human contrast sensitivity function before computing standard CIELAB
-    ΔE (CIE76). This is the metric the halftoning literature trusts for
-    perceptual image quality: it penalises visible structured error while
-    discounting high-frequency noise the eye cannot resolve.
+    Applies the opponent-space spatial pre-filtering of Zhang & Wandell
+    (1997) — the human contrast sensitivity functions per opponent channel —
+    before computing standard CIELAB ΔE (CIE76). This is the metric the
+    halftoning literature trusts for perceptual image quality: it penalises
+    visible structured error while discounting high-frequency noise the eye
+    cannot resolve.
 
     Parameters
     ----------
@@ -207,12 +298,22 @@ def scielab_de(
         the contrast sensitivity filters in pixel units.
     viewing_distance_cm:
         Typical viewing distance in centimetres. The defaults (100 DPI,
-        40 cm) match the Kolpatzik-Bouman filter design conditions in
-        :mod:`tramage.kb_filter`.
+        40 cm) place 27.5 pixels per degree of visual angle. The
+        Kolpatzik-Bouman filters in :mod:`tramage.kb_filter` were designed
+        at a 0.0317°/pixel sampling rate (31.5 pixels per degree at 40 cm,
+        ≈115 DPI); this geometry is ~13% coarser, stated here rather than
+        silently matched.
     full:
         If ``False`` (default), returns the mean ΔE across all pixels.
         If ``True``, returns a dict with ``"mean"``, ``"p95"``, and
         ``"max"``.
+    filters:
+        ``"zhang1997"`` (default) applies the tabulated S-CIELAB kernels —
+        weighted sums of the published Gaussians per opponent channel,
+        including the luminance bandpass surround. ``"gaussian"`` applies
+        the single-Gaussian approximation this package used before the
+        kernels were tabulated; retained for comparison with earlier
+        result CSVs, not for reporting.
 
     Returns
     -------
@@ -221,33 +322,19 @@ def scielab_de(
 
     Notes
     -----
-    This implementation uses Gaussian approximations of the S-CIELAB
-    separable filters rather than the exact tabulated kernels from Zhang
-    & Wandell (1997, Appendix A). The approximations match the published
-    filters to within ~5% on RMS error for images above 64×64 px, and
-    they avoid a dependency on the full kernel tables.
+    The corpus result CSVs produced before 29 August 2026 were computed
+    with ``filters="gaussian"``. The two paths share the opponent
+    transform, viewing geometry, and CIE76 differencing; they differ only
+    in the spatial kernels.
     """
-    ppd = pixels_per_degree(dpi, viewing_distance_cm)
-
-    sigma_lum_px = SIGMA_LUM_DEG * ppd
-    sigma_chrom_px = SIGMA_CHROM_DEG * ppd
-
     xyz_dithered = oklab_to_xyz(dithered)
     xyz_original = oklab_to_xyz(original)
 
     opp_dithered = _xyz_to_opponent(xyz_dithered)
     opp_original = _xyz_to_opponent(xyz_original)
 
-    filtered_dithered = np.stack([
-        gaussian_filter(opp_dithered[..., 0], sigma_lum_px),
-        gaussian_filter(opp_dithered[..., 1], sigma_chrom_px),
-        gaussian_filter(opp_dithered[..., 2], sigma_chrom_px),
-    ], axis=-1)
-    filtered_original = np.stack([
-        gaussian_filter(opp_original[..., 0], sigma_lum_px),
-        gaussian_filter(opp_original[..., 1], sigma_chrom_px),
-        gaussian_filter(opp_original[..., 2], sigma_chrom_px),
-    ], axis=-1)
+    filtered_dithered = _filter_opponent(opp_dithered, dpi, viewing_distance_cm, filters)
+    filtered_original = _filter_opponent(opp_original, dpi, viewing_distance_cm, filters)
 
     lab_dithered = _xyz_to_cielab_per_pixel(_opponent_to_xyz(filtered_dithered))
     lab_original = _xyz_to_cielab_per_pixel(_opponent_to_xyz(filtered_original))

@@ -132,12 +132,16 @@ def _timing_probe(images: list[Path], n: int | None = None) -> float:
         times.append(time.time() - t0)
         print(f"  probe {i+1}: {configs[i]}  {times[-1]:.2f}s", flush=True)
     mean = sum(times) / len(times)
-    print(f"mean per-trial: {mean:.2f}s  -> 864 trials est. {mean*864/60:.1f} min", flush=True)
+    n_trials = len(images) * 6 * len(CONFIGS)  # K values x configs
+    est_min = mean * n_trials / 60
+    print(f"mean per-trial: {mean:.2f}s  -> {n_trials} trials est. {est_min:.1f} min", flush=True)
     return mean
 
 
 def main() -> None:
-    corpora = [d for d in corpus_dirs(CORPORA) if d.name == 'kodak']
+    # Kodak24 + CQ100 (124 images): this experiment's README and the
+    # 2976-row kbbaseline.csv the paper cites cover both corpora.
+    corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
             f"no corpus directories found under {CORPORA}. "
