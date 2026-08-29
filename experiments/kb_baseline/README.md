@@ -19,8 +19,9 @@ error energy toward high spatial frequencies and toward rotational symmetry
 (blue noise) where the visual system is less sensitive. A metric that ignores
 spatial structure cannot see that redistribution.
 
-The two spatial metrics we have confirm this on the existing CSV
-(fs-baseline vs kb-baseline, n=24):
+The two spatial metrics we have confirm this on the pre-re-run Kodak24 CSV
+(fs-baseline vs kb-baseline, n=24; the current corpus has 124 images, so
+these tables do not recompute from `results/kbbaseline.csv`):
 
 | K | noise_L | spectral_anisotropy | lowfreq_frac |
 |---|---|---|---|
@@ -59,7 +60,7 @@ does. S-CIELAB is the arbiter; `noise_L` is not.
 ## Provisional observation, to be confirmed by S-CIELAB
 
 At K=8 on `noise_L` (per-image means): `fs-shaped` 0.0416 vs `kb-baseline`
-0.0908 and `kb-shaped` 0.0558. That is a large effect (24/24 images), and
+0.0908 and `kb-shaped` 0.0558. That is a large effect (124/124 images), and
 54% is a lot of headroom, so the substitution story — *palette-geometry
 shaping on a naive filter recovers the benefit of an HVS-tuned filter* — may
 hold. But it could shrink or reverse once error is measured with spatial
@@ -68,8 +69,8 @@ substitution as the headline until S-CIELAB confirms it.**
 
 ## KB's DC leak, and what shaping does to it — two regimes
 
-The full four-cell `lowfreq_frac` table (per-image means, n=24) splits into
-two regimes:
+The full four-cell `lowfreq_frac` table (pre-re-run Kodak24 corpus,
+per-image means, n=24) splits into two regimes:
 
 | K | kb-baseline | kb-shaped | fs-baseline | fs-shaped |
 |---|---|---|---|---|
@@ -100,13 +101,33 @@ the divergence is in frequency, not isotropy — both shaped arms get more
 directional; they differ in whether that structure sits at low or high
 frequency.
 
-**Limitation to state in the paper:** at K=8, shaping raises FS's
-low-frequency (worm) error by 45% (0.0328 → 0.0474). That is a real cost in
-the headline regime and must appear in the limitations with the number, not
-folded into the already-named tone-noise trade-off.
+**For the paper — the K=8 worm cost, stated with its mechanism.** At K=8, on
+the Kodak subset, shaping raises FS's low-frequency error by 52% (median of
+per-image ratios, current 124-image corpus; pooled means give +41%), while
+on CQ100 it lowers it by 32%; the full-corpus median is −23%. The sign
+reversal is the convergence mechanism, not a caveat: shaping pulls
+low-frequency error toward a common level, so images beginning below that
+level rise and those beginning above it fall. (Supersedes the 45% figure
+cited above — pooled means over the pre-re-run Kodak-only corpus.)
 
-(These are `noise_L`-based low-frequency fractions, not S-CIELAB; the re-run
-will confirm whether the same holds under spatial CSF weighting.)
+Median per-image change in `lowfreq_frac`, FS baseline → shaped:
+
+| K | all 124 | Kodak 24 | CQ100 100 |
+|---|---|---|---|
+| 8 | −23% | +52% | −32% |
+| 16 | −19% | −1% | −29% |
+| 32 | −24% | −16% | −24% |
+| 64 | −36% | −31% | −37% |
+| 128 | −46% | −35% | −47% |
+| 256 | −52% | −34% | −54% |
+
+Read down the Kodak column as the mechanism weakening with K: the rise
+shrinks through the K=16 null (−1%) into the general benefit as baseline
+spread narrows.
+
+(These are L-channel low-frequency fractions, not spatially CSF-weighted;
+whether the same holds under S-CIELAB weighting remains open — the re-run
+did not add such a metric.)
 
 ## Regime of interest
 
@@ -147,11 +168,11 @@ additionally spatially adaptive where a DV&E matrix is fixed for the image.
 
 | Parameter | Value |
 |---|---|
-| Corpus | Kodak24 (24 images, 768×512) |
+| Corpus | Kodak24 + CQ100 (124 images, 768×512 / 512×768) |
 | Palette sizes | K ∈ {8, 16, 32, 64, 128, 256} |
 | Seed | 0 |
 | Configs per trial | 4 (FS/KB × baseline/shaped; DV disabled) |
-| Total trials | 576 (24 × 6 × 4) |
+| Total trials | 2976 (124 × 6 × 4) |
 | `eps` | `DEFAULT_EPS = 0.02²` |
 | Diffusion | FS, KB scalar, DV matrix — all serpentine |
 
@@ -166,57 +187,76 @@ python experiments/kb_baseline/analyze_interaction.py   # trend test + per-K TOS
 ## Verdict
 
 **Shaping helps on top of every filter, and its benefit is largest where the
-filter is weakest — but the magnitude of that asymmetry is measured with
-`noise_L`, which cannot see what the tuned filters do. The interaction is
-monotonic in K (single-DOF trend p = 9×10⁻⁵); whether it implies substitution
-or merely a metric artifact is decided by S-CIELAB, not by `noise_L`.**
+filter is weakest. The interaction is monotonic in K (Jonckheere–Terpstra
+p = 2×10⁻²⁷, n = 124). On S-CIELAB — the arbiter metric — the interaction
+is positive at every K: shaping helps the weaker FS filter more throughout,
+and the `noise_L` crossover below does not survive spatial weighting.**
 
 ### The interaction term
 
 Reported two ways, with the **trend test as primary** (a single
 degree-of-freedom test avoids the multiplicity of six per-K tests):
 
-- **Primary — trend test.** Mean per-image slope of the FS−KB interaction
-  against log₂K: **−0.0030 per doubling, 95% CI [−0.0044, −0.0017],
-  p = 8.9×10⁻⁵**. The interaction declines monotonically with K.
+- **Primary — trend test.** Jonckheere–Terpstra ordered trend across K:
+  **p = 2×10⁻²⁷** (n = 124; mean per-image slope −0.0021 per doubling,
+  reported as a descriptive effect size only — a linear-in-log₂K fit is a
+  poor model of the plateauing interaction). The interaction declines
+  monotonically with K.
 - **Secondary — per-K TOST** against a pre-specified margin θ = 25% of the
   pooled shaping benefit (90% bootstrap CI, α = 0.05 one-sided). Equivalence
-  holds at K=32; it fails elsewhere.
+  holds at K=16–64 and fails at K=8, 128 and 256.
 
-L-channel noise, per-image (n=24), mean ± 90% CI:
+L-channel noise, per-image (n = 124), mean [90% CI]:
 
 | K | main effect | interaction | ratio (interaction / main) | verdict |
 |---|---|---|---|---|
-| 8 | 0.0420 | +0.0141 [+0.0095, +0.0193] | +0.34 [+0.22, +0.47] | not equivalent — FS benefits more |
-| 16 | 0.0382 | +0.0055 [+0.0006, +0.0110] | +0.15 [+0.02, +0.28] | not equivalent — FS benefits more |
-| 32 | 0.0224 | −0.0003 [−0.0020, +0.0013] | −0.01 [−0.09, +0.06] | equivalent |
-| 64 | 0.0130 | −0.0027 [−0.0036, −0.0018] | −0.21 [−0.27, −0.15] | not equivalent — KB benefits more |
-| 128 | 0.0070 | −0.0024 [−0.0030, −0.0018] | −0.34 [−0.42, −0.26] | not equivalent — KB benefits more |
-| 256 | 0.0037 | −0.0020 [−0.0023, −0.0016] | −0.53 [−0.61, −0.45] | not equivalent — KB benefits more |
+| 8 | 0.0356 | +0.0085 [+0.0065, +0.0106] | +0.24 [+0.18, +0.30] | not equivalent — FS benefits more |
+| 16 | 0.0306 | +0.0043 [+0.0027, +0.0060] | +0.14 [+0.09, +0.20] | equivalent |
+| 32 | 0.0199 | +0.0001 [−0.0008, +0.0009] | +0.00 [−0.04, +0.05] | equivalent |
+| 64 | 0.0119 | −0.0021 [−0.0026, −0.0015] | −0.17 [−0.22, −0.13] | equivalent |
+| 128 | 0.0068 | −0.0021 [−0.0024, −0.0017] | −0.31 [−0.36, −0.25] | not equivalent — KB benefits more |
+| 256 | 0.0037 | −0.0018 [−0.0019, −0.0016] | −0.48 [−0.53, −0.42] | not equivalent — KB benefits more |
 
-The **absolute interaction changes sign between K=16 and K=32** (the quantity
-the per-K table reports). The trend test's slope+p is the single-DOF result
-for the monotonic decline; it does not report its own fitted crossing, because
-a linear-in-log₂K fit is a poor model of the plateauing interaction.
+The **absolute interaction crosses zero between K=32 and K=64**, inside the
+mid-range equivalence band (the quantity the per-K table reports). The trend
+test is the single-DOF result for the monotonic decline; it does not report
+a fitted crossing, because a linear-in-log₂K fit is a poor model of the
+plateauing interaction.
 
 Three things follow:
 
-1. **The interaction is monotonic in K** (trend p = 9×10⁻⁵) and changes sign
-   between K=16 and K=32: shaping helps the weaker FS filter more at small K,
-   the KB filter more at large K. Largest where palette geometry is most
-   irregular — a mechanistic finding.
-2. **At K=8 the interaction is 34% [22%, 47%] of the shaping effect** — the
-   same order as the effect. Whether this is substitution or a metric artifact
-   is the S-CIELAB question.
+1. **The interaction is monotonic in K** (Jonckheere–Terpstra p = 2×10⁻²⁷)
+   and crosses zero in the mid-range: shaping helps the weaker FS filter more
+   at small K, the KB filter more at large K. Largest where palette geometry
+   is most irregular — a mechanistic finding.
+2. **At K=8 the interaction is 24% [18%, 30%] of the shaping effect** — the
+   same order as the effect. Whether this is substitution or a metric
+   artifact is answered by S-CIELAB below.
 3. **The large-K negative ratio is a small-denominator artifact.** At K=256
-   the main effect is 0.0037 and the interaction −0.0020; both are tiny in
+   the main effect is 0.0037 and the interaction −0.0018; both are tiny in
    absolute terms. Absolute interaction is reported alongside the ratio so the
    ratio is not misread as a large effect.
 
 Tone-error ratios are omitted from the headline because the tone main effect
 crosses zero at K≥128 (the known tone-accuracy trade-off, reported explicitly
-as a limitation). S-CIELAB ΔE is added to this table once the re-run includes
-it.
+as a limitation).
+
+S-CIELAB ΔE, per-image (n = 124), mean [90% CI] — the arbiter metric,
+included since the re-run:
+
+| K | main effect | interaction | ratio (interaction / main) | verdict |
+|---|---|---|---|---|
+| 8 | 2.265 | +0.739 [+0.491, +0.991] | +0.33 [+0.22, +0.44] | FS benefits more |
+| 16 | 1.739 | +0.704 [+0.516, +0.890] | +0.40 [+0.30, +0.51] | FS benefits more |
+| 32 | 0.884 | +0.412 [+0.307, +0.519] | +0.47 [+0.36, +0.58] | FS benefits more |
+| 64 | 0.406 | +0.157 [+0.096, +0.222] | +0.39 [+0.25, +0.53] | FS benefits more |
+| 128 | 0.154 | +0.063 [+0.026, +0.103] | +0.41 [+0.17, +0.67] | FS benefits more |
+| 256 | 0.037 | +0.022 [−0.001, +0.047] | +0.61 [−0.04, +1.69] | FS benefits more (small denominator) |
+
+No crossover survives spatial weighting: the interaction is positive at
+every K (monotone-decreasing, JT p = 2×10⁻²¹). Shaping helps the weaker FS
+filter more throughout; the `noise_L` sign change above is the metric
+artifact.
 
 ### What this changes for the paper
 
@@ -225,11 +265,13 @@ it.
   whichever headline the S-CIELAB data supports. Substitution is not claimed
   on `noise_L` alone.
 - The shaping × filter interaction is reported as a **single trend test**
-  (monotonic in K, p = 9×10⁻⁵), with per-K TOSTs secondary. The sign change
-  is between K=16 and K=32 (absolute interaction).
-- **DV&E is run, not deferred.** The matrix-valued DV filter is a baseline
-  (`dv-baseline` / `dv-shaped`), and the same metric-blindness caveat applies
-  to it: `noise_L` will understate DV for the same reason it understates KB.
+  (Jonckheere–Terpstra; p = 2×10⁻²⁷ on `noise_L`, p = 2×10⁻²¹ on S-CIELAB),
+  with per-K TOSTs secondary. On S-CIELAB there is no sign change: the
+  interaction is positive at every K.
+- **DV&E remains disabled** (`RUN_DV = False`): its synthetic-training filter
+  design does not generalise to real-image spectra (see above), so the scalar
+  KB result is what the paper reports. The metric-blindness caveat applies to
+  DV for the same reason it applies to KB.
 - The tone trade-off (K ≥ 128) is stated as a limitation in the paper, not
   only here.
 

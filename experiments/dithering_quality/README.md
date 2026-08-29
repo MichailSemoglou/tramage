@@ -51,13 +51,17 @@ primary metrics are the three above.
 
 | Parameter | Value |
 |---|---|
-| Corpus | Kodak24 (24 images, 768×512) |
+| Corpus | Kodak24 + CQ100 (124 images, 768×512 / 512×768) |
 | Palette sizes | K ∈ {8, 16, 32, 64, 128, 256} |
 | Seed | 0 (single; palette-extraction variance was covered by the geometry run) |
 | Variants per trial | 3 (baseline, global, cell) |
-| Total trials | 432 (24 × 6 × 3) |
+| Total trials | 2232 (124 × 6 × 3) |
 | `eps` | `DEFAULT_EPS = 0.02²` |
 | Diffusion | Floyd-Steinberg, serpentine |
+
+The corpus grew from Kodak24 to Kodak24 + CQ100 in the re-run; the tables
+below are Kodak-subset medians from the current CSV unless labelled
+otherwise, and `results/dithering_quality.csv` covers all 124 images.
 
 ## Reproducing
 
@@ -91,7 +95,8 @@ been because it tells the paper where the method's regime actually is.**
 
 ### Numbers
 
-**L-channel noise** (median across 24 images; lower is better):
+**L-channel noise** (median across the 24 Kodak images of the current
+124-image CSV; lower is better):
 
 | K | baseline | global | cell | global vs base | cell vs base |
 |---|---|---|---|---|---|
@@ -102,13 +107,13 @@ been because it tells the paper where the method's regime actually is.**
 | 128 | 0.0132 | 0.0077 | 0.0067 | **−42%** | −49% |
 | 256 | 0.0081 | 0.0054 | 0.0046 | **−33%** | −43% |
 
-**Per-image paired win rate on L noise: 24/24 (100%) at every K, for
+**Per-image paired win rate on L noise: 124/124 (100%) at every K, for
 both global and cell variants.** This is not a distributional shift; it
-is a consistent per-image reduction. Every single Kodak image, at every
+is a consistent per-image reduction. Every image in the corpus, at every
 palette size from 8 to 256, dithers with lower lightness noise when the
 error is shaped.
 
-**Blurred tone error** (median across 24 images; lower is better):
+**Blurred tone error** (median across the 24 Kodak images; lower is better):
 
 | K | baseline | global | cell |
 |---|---|---|---|
@@ -128,19 +133,20 @@ sacrifice is invisible (the palette can't represent that direction
 anyway); at large K the palette has enough colours to begin
 representing it, and damping becomes a real cost.
 
-**Low-frequency error fraction** (the worm metric; lower is better):
+**Low-frequency error fraction** (median across the 24 Kodak images; lower
+is better):
 
 | K | baseline | global | cell |
 |---|---|---|---|
-| 8 | 0.01956 | 0.04050 | 0.04755 |
-| 16 | 0.00458 | 0.00589 | 0.01308 |
-| 32 | 0.00386 | **0.00347** | 0.01426 |
-| 64 | 0.00293 | **0.00166** | 0.01027 |
-| 128 | 0.00184 | **0.00108** | 0.01038 |
-| 256 | 0.00131 | **0.00073** | 0.01021 |
+| 8 | 0.01565 | 0.03170 | 0.04018 |
+| 16 | 0.00430 | **0.00408** | 0.01255 |
+| 32 | 0.00340 | **0.00283** | 0.01170 |
+| 64 | 0.00241 | **0.00142** | 0.00891 |
+| 128 | 0.00146 | **0.00087** | 0.00957 |
+| 256 | 0.00098 | **0.00057** | 0.00953 |
 
 A third pattern. **Global shaping wins the low-frequency metric at K ≥
-32** — confirming the mechanism story: the worm/low-frequency drift the
+16** — confirming the mechanism story: the worm/low-frequency drift the
 method targets is suppressed. But at K=8, global *loses* this metric
 even while winning on noise, and **per-cell loses it at every K**.
 

@@ -58,10 +58,10 @@ Image.fromarray((out * 255).round().astype(np.uint8)).save("dithered.png")
 
 `global_shaping_matrix` computes one matrix from the whole palette’s
 covariance. It is the right default — and, on the evidence to date, the
-right choice full stop: a Kodak24 corpus run (see
-`experiments/dithering_quality/`) found that a per-cell variant matched
-the global matrix on noise reduction but lost on tone accuracy and the
-low-frequency worm metric from K=16 onward. `per_cell_shaping_matrices`
+right choice full stop: a 124-image corpus run (see
+`experiments/dithering_quality/`) found that a per-cell variant holds up
+on noise reduction but loses on tone accuracy and the low-frequency worm
+metric from K=16 onward. `per_cell_shaping_matrices`
 remains exported for completeness and for future palettes whose local
 structure genuinely varies, but it is not the recommended path.
 

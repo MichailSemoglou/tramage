@@ -46,9 +46,9 @@ colour $p_i$, its $k$ nearest palette neighbours (a robust stand-in for a
 Delaunay neighbourhood, which degenerates for rank-deficient palettes) give
 a local covariance and a local matrix $M_i$, rather than one matrix for the
 whole palette. This variant is exported but is **not the recommended
-method**: on a Kodak24 corpus run (see `experiments/dithering_quality/`)
-it matched the global variant on noise reduction but lost on tone accuracy
-and the low-frequency worm metric from K=16 onward. Natural-image k-means
+method**: on a 124-image corpus run (see `experiments/dithering_quality/`)
+it holds up on noise reduction but loses on tone accuracy and the
+low-frequency worm metric from K=16 onward. Natural-image k-means
 palettes are globally degenerate enough that the global matrix already
 captures the relevant structure. The construction is documented here for
 completeness; the rest of this appendix concerns the global variant.
