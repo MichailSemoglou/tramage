@@ -16,6 +16,9 @@ htmlcov/
 ROADMAP.md
 RELATED_WORK.md
 
+# Submission materials (local-only until publication)
+abstract/
+
 # Experiment corpora (large, redistributable; fetched on demand)
 experiments/corpora/
 # Experiment outputs (regenerable from code + corpora)
