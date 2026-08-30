@@ -150,6 +150,34 @@ A third pattern. **Global shaping wins the low-frequency metric at K ≥
 method targets is suppressed. But at K=8, global *loses* this metric
 even while winning on noise, and **per-cell loses it at every K**.
 
+### Pre-specified subgroups: S-CIELAB by corpus
+
+The primary endpoint, split into the preregistered Kodak/CQ100 subgroups
+(`analyze_subgroups.py`; full table in `results/subgroup_scielab.csv`).
+Per-image % reduction from global shaping; sign p is the two-sided
+binomial the abstract quotes, and Wilcoxon (signed-rank, on absolute
+paired differences) is reported alongside in the CSV:
+
+| K | pooled med% (wins, sign p) | Kodak med% (wins, sign p) | CQ100 med% (wins, sign p) |
+|---|---|---|---|
+| 8 | +17.7 (120/124, ~0) | +15.4 (22/24, 4e-5) | +18.9 (98/100, ~0) |
+| 16 | +21.4 (124/124, ~0) | +13.9 (24/24, 1e-7) | +23.1 (100/100, ~0) |
+| 32 | +17.5 (120/124, ~0) | +9.4 (22/24, 4e-5) | +20.3 (98/100, ~0) |
+| 64 | +11.8 (104/124, 7e-15) | −1.0 (11/24, 0.84) | +13.3 (93/100, 3e-20) |
+| 128 | +5.6 (83/124, 2e-4) | −8.8 (4/24, 0.0015) | +8.2 (79/100, 4e-9) |
+| 256 | +1.2 (66/124, 0.53) | −18.0 (0/24, 1e-7) | +3.3 (66/100, 0.0018) |
+
+**The pooled headline masks a corpus divergence from K=64 up.** The
+benefit is confirmed on both corpora at K ≤ 32. At K=64 the Kodak
+subgroup is a wash; at K ≥ 128 shaping significantly *harms* Kodak under
+S-CIELAB while still helping CQ100. The pooled significance at K=64–128
+is carried by CQ100, and the pooled K=256 null (sign p = 0.53; Wilcoxon
+p = 0.15) hides uniform Kodak harm (0/24 wins) against a real CQ100
+gain (median +3.3%). Mean and median diverge at K=256 (mean −1.8% vs
+median +1.2%): a skewed mix of two subgroup behaviours, not a homogeneous
+small effect. The paper reports this split wherever it reports the
+pooled curve.
+
 ### Interpretation
 
 Three findings, each publishable, each of which the paper must state
@@ -194,6 +222,11 @@ hypothesis predicted, and it is what the data says.
   dithering noise by 33–66% across palette sizes**", with the scope
   qualifier "**for small-to-mid palettes (K ≤ 64)**" attached to the
   tone-accuracy claim.
+- The scope claim is per-corpus at large K: under S-CIELAB the benefit
+  holds on both corpora at K ≤ 32; from K = 64 the pooled effect is
+  CQ100-driven, with Kodak null at K = 64 and significantly harmed at
+  K ≥ 128 (see the subgroup table above). The abstract's K = 256
+  parenthetical names the Kodak harm explicitly.
 - The per-cell variant is removed from the central contribution and
   demoted to "explored but not adopted" in the paper.
 - The designer-palette framing suggested earlier becomes more

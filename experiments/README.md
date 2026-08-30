@@ -28,7 +28,12 @@ for the verdict. In short: shaping reduces L-channel noise by a median
 32–59% (Kodak) / 21–41% (CQ100) across K, winning on every image at every
 K; a tone-accuracy trade-off appears only at K ≥ 128 on Kodak and not at
 all on CQ100; per-cell does not earn its complexity and is dropped from
-the paper's central claims.
+the paper's central claims. `dithering_quality/analyze_subgroups.py`
+reports the pre-specified Kodak/CQ100 split of the S-CIELAB benefit: the
+pooled effect from K=64 up is carried by CQ100, with Kodak null at K=64
+and significantly harmed at K ≥ 128. The CSV was regenerated on 30 Aug
+2026 with the tabulated S-CIELAB kernels; earlier CSVs used the
+single-Gaussian approximation.
 
 ## Epsilon sweep (done)
 
@@ -42,7 +47,12 @@ produces (recovered off-plane tone against lightness noise, as in the
 near-degenerate gallery comparison). The purpose is to show `eps` as a
 continuous dial rather than a value to be tuned once and forgotten, and to
 give a starting point for choosing it relative to a palette’s own
-eigenvalue scale.
+eigenvalue scale. `run_corpus_sweep.py` extends this to corpus scale
+(Kodak24 × K ∈ {8, 16, 32} × eps ∈ {0.25x..4x} the default): the S-CIELAB
+benefit never changes sign within that range, and the default sits
+conservative on Kodak — smaller eps gives a larger perceptual benefit at
+the cost of less noise reduction. See the epsilon_sweep README for the
+table.
 
 ## Clustered-palette test (closed, negative)
 
@@ -105,4 +115,8 @@ short: shaping reduces noise by a median 22–33% on top of the KB filter,
 winning on 124/124 images at every K — the generalisation claim holds, at
 reduced magnitude relative to the FS comparison. The full matrix-valued DV filter
 remains as a possible follow-up if a reviewer demands the exact
-comparison; the scalar KB result is indicative.
+comparison; the scalar KB result is indicative. The interaction statistics
+(`kb_baseline/analyze_interaction.py`) and the exploratory two-regime
+robustness check (`kb_baseline/analyze_regimes.py`) were regenerated on
+30 Aug 2026 with the corrected S-CIELAB kernels; see the kb_baseline
+README for the current table and the regime caveats.

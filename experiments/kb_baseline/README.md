@@ -129,6 +129,34 @@ spread narrows.
 whether the same holds under S-CIELAB weighting remains open — the re-run
 did not add such a metric.)
 
+### The two-regime split is exploratory: robustness and caveats (30 Aug)
+
+The 0.02 boundary was chosen by eye, after the re-run, and is not in the
+preregistration. `analyze_regimes.py` (output: `results/regime_robustness.csv`)
+reports the finding with its caveats rather than as an established result:
+
+- **Threshold robustness.** The sign flip holds at every threshold from
+  0.01 to 0.03 (figure window K=16–64: below-regime median excess
+  +0.0056/+0.0051/+0.0048/+0.0046 at 0.01/0.015/0.02/0.03; above-regime
+  −0.0020/−0.0031/−0.0062/−0.0125). The pattern is real, but the "above"
+  magnitude triples across the range — the boundary is graded, not sharp.
+- **The split confounds image with K.** The share of cells below 0.02 rises
+  from 21% at K=8 to 98% at K≥128, so "the image's own low-frequency error"
+  partly re-describes palette size. Per-K splits are in the CSV.
+- **It is a low-frequency-energy statement, not a perceptual one.** On
+  S-CIELAB, KB beats FS in only 16–29% of cells in either regime in the
+  figure window (45% above the boundary at all-K) — there is no majority
+  perceptual benefit in either regime.
+- **Reconciliation.** ROADMAP §8 (19 Aug) quotes +0.0053/−0.0109; Figure 1
+  shows +0.005/−0.006. The difference is provenance and window: §8 used the
+  superseded pre-correction CSV; the figure computes on the current CSV over
+  K=16–64 (+0.0048/−0.0062). The current CSV's all-K cut gives
+  +0.0041/−0.0091. Both windows are printed by `analyze_regimes.py`.
+
+For the paper: report the observation as exploratory, with the threshold
+rule, its robustness range, and the per-K confound stated; do not frame it
+as a perceptual benefit of the KB filter above the boundary.
+
 ## Regime of interest
 
 Shaping is a **small-to-moderate-K intervention** (K ≤ 64). That is where
@@ -188,9 +216,12 @@ python experiments/kb_baseline/analyze_interaction.py   # trend test + per-K TOS
 
 **Shaping helps on top of every filter, and its benefit is largest where the
 filter is weakest. The interaction is monotonic in K (Jonckheere–Terpstra
-p = 2×10⁻²⁷, n = 124). On S-CIELAB — the arbiter metric — the interaction
-is positive at every K: shaping helps the weaker FS filter more throughout,
-and the `noise_L` crossover below does not survive spatial weighting.**
+p = 2×10⁻²⁷, n = 124). On S-CIELAB — the arbiter metric — the interaction is
+positive where the shaping effect is non-negligible (K ≤ 32, CIs clear of
+zero) and declines monotonically (JT p = 2×10⁻¹⁹); from K = 64 the CIs
+straddle zero as the main effect collapses. Shaping helps the weaker FS
+filter more in the regime that matters, and the `noise_L` crossover below
+does not survive spatial weighting there.**
 
 ### The interaction term
 
@@ -242,21 +273,24 @@ crosses zero at K≥128 (the known tone-accuracy trade-off, reported explicitly
 as a limitation).
 
 S-CIELAB ΔE, per-image (n = 124), mean [90% CI] — the arbiter metric,
-included since the re-run:
+computed with the tabulated Zhang & Wandell kernels (30 Aug re-run; the
+previous table was the Gaussian-approximation run):
 
 | K | main effect | interaction | ratio (interaction / main) | verdict |
 |---|---|---|---|---|
-| 8 | 2.265 | +0.739 [+0.491, +0.991] | +0.33 [+0.22, +0.44] | FS benefits more |
-| 16 | 1.739 | +0.704 [+0.516, +0.890] | +0.40 [+0.30, +0.51] | FS benefits more |
-| 32 | 0.884 | +0.412 [+0.307, +0.519] | +0.47 [+0.36, +0.58] | FS benefits more |
-| 64 | 0.406 | +0.157 [+0.096, +0.222] | +0.39 [+0.25, +0.53] | FS benefits more |
-| 128 | 0.154 | +0.063 [+0.026, +0.103] | +0.41 [+0.17, +0.67] | FS benefits more |
-| 256 | 0.037 | +0.022 [−0.001, +0.047] | +0.61 [−0.04, +1.69] | FS benefits more (small denominator) |
+| 8 | 2.288 | +0.856 [+0.584, +1.141] | +0.37 [+0.25, +0.50] | FS benefits more |
+| 16 | 1.736 | +0.611 [+0.417, +0.807] | +0.35 [+0.24, +0.46] | FS benefits more |
+| 32 | 0.856 | +0.293 [+0.189, +0.400] | +0.34 [+0.22, +0.46] | FS benefits more |
+| 64 | 0.381 | +0.053 [−0.005, +0.114] | +0.14 [−0.01, +0.30] | positive, CI straddles zero |
+| 128 | 0.141 | +0.005 [−0.030, +0.041] | +0.03 [−0.22, +0.30] | null (main effect small) |
+| 256 | 0.032 | −0.006 [−0.027, +0.017] | −0.18 [−1.11, +0.66] | null (small denominator) |
 
-No crossover survives spatial weighting: the interaction is positive at
-every K (monotone-decreasing, JT p = 2×10⁻²¹). Shaping helps the weaker FS
-filter more throughout; the `noise_L` sign change above is the metric
-artifact.
+The interaction is positive and clear of zero where the shaping effect is
+non-negligible (K ≤ 32) and declines monotonically (JT p = 2×10⁻¹⁹). From
+K = 64 the CIs straddle zero as the main effect collapses; at K = 256 the
+point estimate is slightly negative, nonsignificant. The `noise_L` sign
+change above is the metric artifact in the regime that matters; "positive
+at every K with confidence" no longer holds at large K, and is not claimed.
 
 ### What this changes for the paper
 
@@ -265,9 +299,10 @@ artifact.
   whichever headline the S-CIELAB data supports. Substitution is not claimed
   on `noise_L` alone.
 - The shaping × filter interaction is reported as a **single trend test**
-  (Jonckheere–Terpstra; p = 2×10⁻²⁷ on `noise_L`, p = 2×10⁻²¹ on S-CIELAB),
-  with per-K TOSTs secondary. On S-CIELAB there is no sign change: the
-  interaction is positive at every K.
+  (Jonckheere–Terpstra; p = 2×10⁻²⁷ on `noise_L`, p = 2×10⁻¹⁹ on S-CIELAB
+  under the corrected kernels), with per-K TOSTs secondary. On S-CIELAB the
+  interaction is positive with clear CIs at K ≤ 32 and fades with the main
+  effect; no large-K sign change is claimed.
 - **DV&E remains disabled** (`RUN_DV = False`): its synthetic-training filter
   design does not generalise to real-image spectra (see above), so the scalar
   KB result is what the paper reports. The metric-blindness caveat applies to

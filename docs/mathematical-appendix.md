@@ -41,6 +41,16 @@ floor, and only the share of variance exceeding it is treated as real
 signal. Here, the “signal” is palette extent and the “noise floor” is the
 smallest variance worth protecting error along.
 
+Two conventions matter for reproducing the numbers. First, $\varepsilon$ is
+an *absolute* scale in Oklab-variance units (the default, $0.02^2$, is used
+unchanged across the corpus runs); it is not normalised by palette extent,
+so the same $\varepsilon$ damps a narrow palette more than a wide one.
+Second, $\Sigma$ is the unweighted population covariance over the palette
+colours ($1/n$ divisor, no share weighting): a colour covering half the
+image shapes $M$ no more than one covering a fraction of a percent. The
+corpus-scale sensitivity of the headline numbers to $\varepsilon$ is
+measured in `experiments/epsilon_sweep/` (the corpus sweep).
+
 The per-cell variant applies the same construction locally: for palette
 colour $p_i$, its $k$ nearest palette neighbours (a robust stand-in for a
 Delaunay neighbourhood, which degenerates for rank-deficient palettes) give
