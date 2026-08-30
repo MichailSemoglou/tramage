@@ -30,6 +30,10 @@ KAPPA_LAB = (1.0 / 3.0) * (29.0 / 6.0) ** 2
 
 # Poirson & Wandell (1996) pattern-colour separable opponent matrix, XYZ D65
 # -> opponent (O1 luminance, O2 red-green, O3 blue-yellow).
+# Note: Zhang & Wandell (1997, p. 62) print the O2 row with -0.077 for the Z
+# coefficient, but that sign is inconsistent with the paper's own printed
+# inverse; the canonical SCIELAB-1996/ISET implementation uses +0.077, as
+# here. Worth a footnote in the paper to pre-empt the reviewer check.
 XYZ_TO_OPP: np.ndarray = np.array([
     [0.2787, 0.7218, -0.1066],
     [-0.4486, 0.2898, 0.0777],

@@ -102,6 +102,14 @@ complexity. The 100% win rate on a 100-image corpus with category diversity
 substantially strengthens the paper's central claim relative to the
 single-corpus Kodak24 result.
 
+**Note (30 Aug 2026):** `results/cq100_dithering_quality.csv` is stale — it
+duplicates the pre-correction `dithering_quality.csv` (plus a `category`
+column) and its `scielab_de` column used the Gaussian-approximation kernels.
+The canonical 124-image CSV is
+`dithering_quality/results/dithering_quality.csv` (tabulated kernels).
+Re-run `run_cq100.py` only if the per-category breakdown is needed; otherwise
+treat this file as superseded.
+
 ## Damera-Venkata baseline (done, scalar KB scope)
 
 `kb_baseline/` tests whether palette-structure-aware shaping still helps

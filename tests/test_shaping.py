@@ -103,3 +103,18 @@ def test_shaping_matrix_rejects_empty_points():
     not a cryptic division-by-zero."""
     with pytest.raises(ValueError, match="at least one point"):
         shaping_matrix(np.empty((0, 3)))
+
+
+def test_global_shaping_matrix_golden_value():
+    """Hand-computed golden value. For a palette spread only along L, the
+    population covariance has a single non-zero eigenvalue lam = var(L)
+    = 0.02/3, so the shaping matrix is diag(g, 0, 0) with g = lam/(lam+eps).
+    Pins the exact construction (population covariance, absolute eps scale)
+    against silent edits."""
+    palette = np.array([[0.5, 0.0, 0.0], [0.6, 0.0, 0.0], [0.7, 0.0, 0.0]])
+    eps = 0.001
+    lam = 0.02 / 3.0
+    g = lam / (lam + eps)
+    M, _, gains = global_shaping_matrix(palette, eps=eps)
+    np.testing.assert_allclose(M, np.diag([g, 0.0, 0.0]), atol=1e-12)
+    np.testing.assert_allclose(sorted(gains), [0.0, 0.0, g], atol=1e-12)

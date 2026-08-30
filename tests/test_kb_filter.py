@@ -68,3 +68,16 @@ def test_kb_diffuse_with_shaping_differs_from_without():
     unshaped, _ = kb_diffuse(image, palette, f)
     shaped, _ = kb_diffuse(image, palette, f, shaping=M)
     assert not np.allclose(unshaped, shaped)
+
+
+def test_kb_filters_match_published_table1():
+    """Pin the exact kolpatzik1992 Table 1 ("1st order LP") coefficients, in
+    the FS support order ((0,1), (1,-1), (1,0), (1,1)). The KB baseline is
+    only meaningful if these are the paper's values; a silent edit must fail
+    loudly."""
+    expected = np.array([
+        [0.7770, -0.009, 0.7861, -0.6098],   # luminance (Y)
+        [0.8767, 0.0359, 0.8205, -0.7376],   # chrominance (rg)
+        [0.8767, 0.0359, 0.8205, -0.7376],   # chrominance (yb)
+    ])
+    np.testing.assert_allclose(kb_filters().weights, expected, atol=1e-12)

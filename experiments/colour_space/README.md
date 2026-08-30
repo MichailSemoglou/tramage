@@ -116,6 +116,12 @@ same image and K):
 Oklab wins the head-to-head on 23/24 images at every K. This is not a
 close call.
 
+*Note (30 Aug 2026): the `scielab_de` column in `results/headtohead.csv`
+was computed with the Gaussian-approximation S-CIELAB kernels. The verdicts
+above rest on relative noise and tone improvements and are unaffected; the
+S-CIELAB column should be treated as superseded until this experiment is
+re-run.*
+
 **Relative tone-error improvement from shaping** (positive = shaped has
 lower tone error):
 

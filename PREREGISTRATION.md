@@ -1,7 +1,36 @@
 # Pre-registration of the 2026 re-run analyses
 
-**Dated:** 19 August 2026 — before the corpus re-run that produces the
-authoritative per-image data for the paper.
+**Frozen 30 August 2026.** This file now separates what was written before
+the re-run produced data from what was added after, so that the paper's
+"pre-registered" claims are exactly checkable against git history. Nothing
+has been deleted; sections have been moved, not rewritten.
+
+Timeline (all 19 August 2026, UTC+8):
+
+- 00:31 (`3e4ca54`) — file created: primary endpoint, hypotheses,
+  equivalence margin, reporting conventions, first-analysis plan,
+  provenance.
+- 00:40 (`3d9aee1`) and 00:49 (`dd4eaba`) — hypothesis 3 reworded
+  (substitution made provisional on S-CIELAB; Jonckheere-Terpstra trend
+  test named). Still before any data.
+- ~01:00 — the corpus re-run began (code commit `8931a13`); the CSVs were
+  finalised at 16:56 and 17:33.
+- 12:39 (`40720f1`) — no content change to this file's claims.
+- 12:43 (`b8e802d`) — **Amendment A** (K=8 contingency), while the run was
+  in flight, before its results were read.
+- 17:16 (`5ec1205`) — rank-agreement results committed; data now read.
+- 18:04 (`1556ef8`) — **Amendment B** (subgroup analysis), after the main
+  CSVs.
+- 18:12 (`647c90c`) — **Amendment C** (palette-geometry regression), after
+  the main CSVs.
+- 18:27–18:28 (`6a8dfd0`, `7b4d576`) — **Amendment D** (fixed-palette
+  readout), after the main CSVs but before the fixed-palette run (20:19),
+  so it is pre-registered *for that experiment*.
+
+The term "pre-registered" is claimed only for Part 1. The amendments are
+dated above and cited as amendments in the paper.
+
+# Part 1 — pre-registered before the re-run
 
 This file pre-specifies the primary endpoints, comparison family, equivalence
 margin, and analysis procedures for the four dithering-quality re-runs
@@ -52,9 +81,10 @@ single-DOF trend test in hypothesis 3. Both are implemented in
 
 - Per-image paired differences with effect sizes and bootstrap confidence
   intervals, not p-values alone. No bare `p < 0.05` without an interval.
-- The term "pre-registered" is claimed only for the analyses declared in this
-  file, and only because this file predates the re-run. The earlier ROADMAP
-  median-table figures are exploratory and are not described as pre-registered.
+- The term "pre-registered" is claimed only for the analyses declared in
+  Part 1 of this file, and only because Part 1 predates the re-run. The
+  earlier ROADMAP median-table figures are exploratory and are not described
+  as pre-registered.
 
 ## First analysis after the re-run
 
@@ -65,7 +95,19 @@ claim, Oklab metrics are the mechanism). Disagreement changes the paper's
 structure and is the more interesting result; it must be known first.
 Implemented in `experiments/analyze_rank_agreement.py`.
 
-## Contingent interpretation — the K=8 outcome
+## Provenance
+
+Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
+is uncommitted) and `corpus_sha256` (SHA-256 over the sorted image paths and
+each file's digest), so any figure can be traced to the exact code and corpus
+that produced it.
+
+# Amendments — added once the re-run was under way or complete
+
+## Amendment A — contingent interpretation, the K=8 outcome (19 Aug, 12:43)
+
+Added while the re-run was in flight (commit `b8e802d`), before its results
+were read.
 
 The small-K (K=8) shaping benefit currently rests on `noise_L`, which cannot
 see spatial structure; both spatially aware metrics (`lowfreq_frac` +45%,
@@ -85,7 +127,9 @@ pre-specified:
 The rank agreement (`scielab_de` vs `noise_L`) is the first result read from
 the re-run; it decides which of the two papers is being written.
 
-## Subgroup analysis — Kodak vs CQ100
+## Amendment B — subgroup analysis, Kodak vs CQ100 (19 Aug, 18:04)
+
+Added after the main CSVs were finalised (commit `1556ef8`).
 
 The two corpora are analysed jointly and as pre-specified subgroups (Kodak24,
 24 images; CQ100, 100 images). Shaping is hypothesised to impose a
@@ -101,7 +145,9 @@ This replaces any "independent replication" framing: the re-run analysed one
 124-image set (a `corpus_dirs` bug combined the corpora), so the subsets are a
 subgroup analysis, not independent confirmation.
 
-## Palette-geometry regression (pre-specified)
+## Amendment C — palette-geometry regression (19 Aug, 18:12)
+
+Added after the main CSVs were finalised (commit `647c90c`).
 
 The positive form of the "palette-determined" claim. **Pre-specified
 predictor: condition number** of the palette covariance (λ_max/λ_min), the
@@ -115,7 +161,10 @@ post-shaping lowfreq is palette-determined, not image-determined. Eigenvalue
 spread and nearest-neighbour spacing are reported as exploratory checks only,
 not as pre-specified predictors.
 
-## Fixed-palette experiment (pre-specified readout)
+## Amendment D — fixed-palette experiment readout (19 Aug, 18:27–18:28)
+
+Added after the main CSVs (commits `6a8dfd0`, `7b4d576`) but before the
+fixed-palette run (20:19), so it is pre-registered for that experiment.
 
 A fixed palette is applied across many images to decouple palette geometry
 from image content (the per-image-palette confound). Design: 10 seed palettes
@@ -152,10 +201,3 @@ palette condition number; if well-conditioned palettes leave image content
 intact while badly-conditioned ones flatten it, a single ICC averages two
 regimes and describes neither, so report per-palette within variance against
 condition number.
-
-## Provenance
-
-Every result CSV records `git_sha` (repo commit, suffixed `-dirty` if the tree
-is uncommitted) and `corpus_sha256` (SHA-256 over the sorted image paths and
-each file's digest), so any figure can be traced to the exact code and corpus
-that produced it.
