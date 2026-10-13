@@ -245,3 +245,14 @@ and HVS filter tuning address largely the same component of the error.
 The residual shaped-vs-DV comparison favors the cheap method: shaped
 Floyd-Steinberg matches `dv-baseline` at K = 8 (p = 0.24), significantly
 beats it at K = 16–64 (p ≤ 0.028), and is comparable thereafter.
+
+## History note — public-history rewrite (13 Oct 2026)
+
+On 13 October 2026 the repository's public history was rewritten with
+git filter-repo to remove private files (reference PDFs, internal process
+documents, and retired files) from every commit. All commit hashes changed
+as a result. The hashes cited in the timeline above refer to the original,
+privately archived development history, which is preserved in full as a
+git bundle (`tramage-history-backup-20261013.bundle`) and is available to
+reviewers on request. The rewrite removed files and commits that became
+empty; it changed nothing in this file's claims, dates, or amendment order.
