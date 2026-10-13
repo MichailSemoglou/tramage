@@ -14,7 +14,7 @@ Timeline (all 19 August 2026, UTC+8):
   (substitution made provisional on S-CIELAB; Jonckheere-Terpstra trend
   test named). Still before any data.
 - ~01:00 — the corpus re-run began (code commit `8931a13`); the CSVs were
-  finalised at 16:56 and 17:33.
+  finalized at 16:56 and 17:33.
 - 12:39 (`40720f1`) — no content change to this file's claims.
 - 12:43 (`b8e802d`) — **Amendment A** (K=8 contingency), while the run was
   in flight, before its results were read.
@@ -26,6 +26,8 @@ Timeline (all 19 August 2026, UTC+8):
 - 18:27–18:28 (`6a8dfd0`, `7b4d576`) — **Amendment D** (fixed-palette
   readout), after the main CSVs but before the fixed-palette run (20:19),
   so it is pre-registered *for that experiment*.
+- 8 September 2026 — **Outcome note on hypothesis 4** appended (post-data;
+  uncommitted at the time of writing).
 
 The term "pre-registered" is claimed only for Part 1. The amendments are
 dated above and cited as amendments in the paper.
@@ -56,8 +58,8 @@ collected, not reverse-engineered afterwards.
    error, tracked by `lowfreq_frac` and `spectral_anisotropy`.
 3. **Interaction + trend (the FS/KB factorial).** The primary test is a
    single-degree-of-freedom **trend test**: the per-image slope of the FS−KB
-   interaction against log₂K, tested by a one-sample t-test on the 24 per-image
-   slopes. Per-K TOST equivalence tests (θ = 25% of the pooled shaping benefit)
+   interaction against log₂K, tested by a Jonckheere-Terpstra trend test on the
+   per-image slopes. Per-K TOST equivalence tests (θ = 25% of the pooled shaping benefit)
    are secondary, used only to locate the sign change. Whether the small-K
    asymmetry implies *substitution* (shaping on a naive filter recovers the
    benefit of an HVS-tuned filter) is tested by S-CIELAB ΔE, not by `noise_L`:
@@ -83,8 +85,8 @@ single-DOF trend test in hypothesis 3. Both are implemented in
   intervals, not p-values alone. No bare `p < 0.05` without an interval.
 - The term "pre-registered" is claimed only for the analyses declared in
   Part 1 of this file, and only because Part 1 predates the re-run. The
-  earlier ROADMAP median-table figures are exploratory and are not described
-  as pre-registered.
+  earlier ROADMAP median-table figures (from a private working document) are
+  exploratory and are not described as pre-registered.
 
 ## First analysis after the re-run
 
@@ -121,7 +123,7 @@ pre-specified:
   does not see. The 45% worm cost is already named, so this is a finding, not
   a concession.
 - **If S-CIELAB confirms shaping at K=8:** the perceptual gain from reduced
-  colour error outweighs the added spatial structure — worth a paragraph, as
+  color error outweighs the added spatial structure — worth a paragraph, as
   that trade is the interesting claim.
 
 The rank agreement (`scielab_de` vs `noise_L`) is the first result read from
@@ -129,10 +131,10 @@ the re-run; it decides which of the two papers is being written.
 
 ## Amendment B — subgroup analysis, Kodak vs CQ100 (19 Aug, 18:04)
 
-Added after the main CSVs were finalised (commit `1556ef8`).
+Added after the main CSVs were finalized (commit `1556ef8`).
 
-The two corpora are analysed jointly and as pre-specified subgroups (Kodak24,
-24 images; CQ100, 100 images). Shaping is hypothesised to impose a
+The two corpora are analyzed jointly and as pre-specified subgroups (Kodak24,
+24 images; CQ100, 100 images). Shaping is hypothesized to impose a
 palette-determined low-frequency level that pulls both corpora toward a common
 value, so the subgroup analyses are:
 
@@ -141,13 +143,13 @@ value, so the subgroup analyses are:
   (global − baseline)-vs-baseline regression, per corpus.
 - The KB DC-leak floor and the shaping-compensation interaction, per corpus.
 
-This replaces any "independent replication" framing: the re-run analysed one
+This replaces any "independent replication" framing: the re-run analyzed one
 124-image set (a `corpus_dirs` bug combined the corpora), so the subsets are a
 subgroup analysis, not independent confirmation.
 
 ## Amendment C — palette-geometry regression (19 Aug, 18:12)
 
-Added after the main CSVs were finalised (commit `647c90c`).
+Added after the main CSVs were finalized (commit `647c90c`).
 
 The positive form of the "palette-determined" claim. **Pre-specified
 predictor: condition number** of the palette covariance (λ_max/λ_min), the
@@ -191,7 +193,7 @@ of magnitude with a single outlier (yasaka_pagoda, cond 1.6e5; the next is
 2.8e3). ICC is computed on the **nine well-conditioned palettes (cond < 3e3)**,
 and the pagoda palette is reported separately as a case, so one point does not
 carry the leverage on the pooled ICC. The case reading: the thesis predicts the
-badly-conditioned palette produces the *most* palette-determined behaviour, i.e.
+badly-conditioned palette produces the *most* palette-determined behavior, i.e.
 the lowest within-palette variance — the mechanism visible in a single case,
 shown in a figure rather than an ICC number.
 
@@ -201,3 +203,45 @@ palette condition number; if well-conditioned palettes leave image content
 intact while badly-conditioned ones flatten it, a single ICC averages two
 regimes and describes neither, so report per-palette within variance against
 condition number.
+
+# Outcome notes — post-data, added as results land
+
+These notes record outcomes against the Part 1 hypotheses. They are not
+amendments: they change no planned analysis, they only say what happened.
+
+## Hypothesis 4 (DV) outcome — supported on CQ100, reversed on Kodak (8 Sep 2026)
+
+Hypothesis 4 (Part 1): shaping still reduces S-CIELAB ΔE on top of the full
+matrix-valued Damera-Venkata filter (`dv-shaped` vs `dv-baseline`).
+
+The comparison became possible on 8 September 2026, after a closed-form
+redesign of `tramage.dv_filter` (the original iterated synthetic-training
+design did not generalize to real-image spectra; root causes and the fix are
+documented in `experiments/kb_baseline/README.md`). The filter used is
+therefore an Oklab-domain reimplementation of Damera-Venkata & Evans, not a
+device-linear-RGB port; it reproduces the expected prior-art behavior (the
+strongest unshaped baseline on S-CIELAB at every K). The run: 124 images ×
+K ∈ {8, 16, 32, 64, 128, 256} × {dv-baseline, dv-shaped}, in
+`experiments/kb_baseline/results/kbbaseline.csv`; analysis in
+`experiments/kb_baseline/analyze_dv.py`.
+
+Pooled (n = 124), the hypothesis is at best weakly supported: median ΔE
+reduction +1.0% at K = 8 (p = 8.6e-04) and +1.4% at K = 16 (p = 0.044),
+nonsignificant at K = 32–128 (+1.5 to +2.4%, p = 0.12–0.75), slightly
+negative at K = 256 (−0.3%, p = 0.62).
+
+Under the Amendment B subgroups the outcome splits cleanly, and the Kodak
+arm reverses the hypothesis:
+
+- **CQ100 (n = 100): supported at every K** — from +1.3% (K = 8) to +4.4%
+  (K = 64), all p ≤ 0.0095.
+- **Kodak (n = 24): reversed from K = 16 upward** — −7.0% (p = 0.0011),
+  −11.0% (K = 32), −18.6% (K = 64), −23.5% (K = 128), −30.6% (K = 256), all
+  p ≤ 0.0011; at K = 8 the Kodak median is already −1.2% (p = 0.029).
+
+Interpretation recorded for the manuscript: on top of the full matrix filter
+the shaping × filter overlap is nearly complete — palette-geometry shaping
+and HVS filter tuning address largely the same component of the error.
+The residual shaped-vs-DV comparison favors the cheap method: shaped
+Floyd-Steinberg matches `dv-baseline` at K = 8 (p = 0.24), significantly
+beats it at K = 16–64 (p ≤ 0.028), and is comparable thereafter.
