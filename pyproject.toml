@@ -53,4 +53,10 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+# E/F: correctness. I: import sorting. UP: pyupgrade. D: docstring drift
+# (pydocstyle), added once the documentation review landed. Excluded
+# deliberately: D103/D105 (a docstring on every public function, including
+# tests — the suite documents behavior in prose where needed) and D401
+# (imperative mood; the package's docstrings favor plain descriptive style).
+select = ["E", "F", "I", "UP", "D"]
+ignore = ["D103", "D105", "D401"]
