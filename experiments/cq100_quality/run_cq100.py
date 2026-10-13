@@ -3,7 +3,9 @@
 Mirrors ``experiments/dithering_quality/run_quality.py`` but operates on the
 CQ100 corpus (100 images, 8 categories). CQ100 provides category-level
 breakdowns that Kodak24 cannot: animals, food, objects, people, places,
-plants, vehicles, miscellaneous.
+plants, vehicles, miscellaneous. The image-to-category mapping lives in
+``experiments/corpora/cq100/categories.csv`` (hand-prepared, one category
+per image); when it is absent, every row gets an empty category.
 
 Each (image, K) trial is scored with ``tramage.metrics``. Output is one
 row per (corpus, image, K, variant) in a CSV. Crash-safe: each row is
@@ -103,7 +105,7 @@ def main() -> None:
     for corpus in corpora:
         all_images += images_in(corpus)
     if not all_images:
-        raise SystemExit("no .png/.jpg images found in any corpus")
+        raise SystemExit("no .png/.jpg/.ppm images found in any corpus")
 
     prov = provenance(all_images, HERE.parent.parent)
 

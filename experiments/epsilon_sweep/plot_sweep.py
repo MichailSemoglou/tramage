@@ -2,9 +2,9 @@
 
 Produces two figures:
 
-1. ``results/sweep_pareto.png`` — noise_std vs blurred_tone_error, with
-   eps colour-coded along the curve.
-2. ``results/sweep_scielab.png`` — S-CIELAB ΔE vs eps, with the default
+1. ``results/sweep_pareto.png``: noise_std vs blurred_tone_error, with
+   eps color-coded along the curve.
+2. ``results/sweep_scielab.png``: S-CIELAB ΔE vs eps, with the default
    eps marked.
 
 Run after ``run_sweep.py``::
@@ -48,12 +48,10 @@ def _pareto_figure(rows: list[dict]) -> None:
                          edgecolors="k", linewidths=0.3, s=60, zorder=3)
     ax.plot(noise, tone, color="0.5", linewidth=0.8, zorder=2)
 
-    default_mask = np.isclose(epsilons, DEFAULT_EPS, rtol=0.05)
-    if default_mask.any():
-        idx = np.argmax(default_mask)
-        ax.scatter(noise[idx], tone[idx], marker="*", s=200,
-                   color="tab:red", edgecolors="k", linewidths=0.5,
-                   zorder=4, label=f"default eps ({DEFAULT_EPS:.2e})")
+    idx = int(np.argmin(np.abs(epsilons - DEFAULT_EPS)))  # nearest grid point
+    ax.scatter(noise[idx], tone[idx], marker="*", s=200,
+               color="tab:red", edgecolors="k", linewidths=0.5,
+               zorder=4, label=f"default eps ({DEFAULT_EPS:.2e})")
 
     fig.colorbar(scatter, ax=ax, label="log10(eps)")
     ax.set_xlabel("noise std (L channel)")

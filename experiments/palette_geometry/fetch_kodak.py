@@ -1,9 +1,9 @@
 """Download the Kodak Lossless True Color Image Suite (Kodak24).
 
-The 24 images are hosted by the maintainer at r0k.us and are in the public
-domain, released by the Eastman Kodak Company. They are the standard test
-set in the dithering and colour-quantization literature and are used here
-unchanged. Files already present are skipped, so this is safe to re-run.
+The 24 images are hosted at r0k.us and are in the public domain, released
+by the Eastman Kodak Company. They are the standard test set in the
+dithering and color-quantization literature and are used here unchanged.
+Files already present are skipped, so this is safe to re-run.
 
 Run from the repository root::
 

@@ -5,15 +5,13 @@ treated as degenerate: larger eps damps more aggressively (less noise, less
 off-plane fidelity), smaller eps approaches the unshaped baseline.
 
 This script fixes one image and palette, sweeps eps from 1e-6 to 1e-1
-(log-spaced), and scores each trial on:
-
-- noise_std (L channel)
-- blurred_tone_error
-- scielab_de (S-CIELAB ΔE, the field's standard perceptual metric)
+(log-spaced), and scores each trial on the CSV's three metrics:
+``noise_L``, ``tone_error``, and ``scielab_de`` (S-CIELAB ΔE, the field's
+standard perceptual metric).
 
 Output is a CSV in ``results/epsilon_sweep.csv``, one row per eps value.
 The purpose is to produce the noise-vs-tone Pareto front that turns eps
-from a tunable parameter into a characterised trade-off.
+from a tunable parameter into a characterized trade-off.
 
 Run from the repository root::
 
@@ -59,9 +57,10 @@ def _load_image(path: Path | None) -> np.ndarray:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Epsilon sweep for palette shaping.")
     parser.add_argument("--image", type=Path, default=None,
-                        help="Path to an image file. Defaults to a synthetic gradient.")
+                        help="Path to an image file. Defaults to a synthetic "
+                             "gradient-plus-blob test image.")
     parser.add_argument("--K", type=int, default=8,
-                        help="Number of palette colours to extract (default: 8).")
+                        help="Number of palette colors to extract (default: 8).")
     parser.add_argument("--seed", type=int, default=0,
                         help="Random seed for k-means (default: 0).")
     args = parser.parse_args()
@@ -72,7 +71,7 @@ def main() -> None:
     csv_path = RESULTS / "epsilon_sweep.csv"
     epsilons = np.logspace(np.log10(EPS_BOTTOM), np.log10(EPS_TOP), N_EPS)
 
-    print(f"image: {args.image or 'synthetic gradient'}")
+    print(f"image: {args.image or 'synthetic gradient-plus-blob'}")
     print(f"K: {args.K}, seed: {args.seed}")
     print(f"eps range: {EPS_BOTTOM:.0e} – {EPS_TOP:.0e} ({N_EPS} steps)")
     print(f"default eps (DEFAULT_EPS): {DEFAULT_EPS:.2e}")

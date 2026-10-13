@@ -1,4 +1,14 @@
-"""Photo pipeline: k-means palette in Oklab, three dithering variants."""
+"""Photo pipeline: k-means palette in Oklab, three dithering variants.
+
+Historical record (see README.md); the original hardcoded input/output
+paths were sanitized: pass the input photograph as a command-line argument,
+and figures write to prototypes/out/. Run from the prototypes/ folder: the
+exec line below reads palette_aware_dither.py by relative path and splits
+its source on a 74-character marker line.
+"""
+import argparse
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 from scipy.cluster.vq import kmeans2
@@ -6,8 +16,15 @@ from scipy.ndimage import gaussian_filter
 
 exec(open("palette_aware_dither.py").read().split("# ---------------------------------------------------------------- palette")[0])
 
+OUT = Path(__file__).resolve().parent / "out"
+OUT.mkdir(exist_ok=True)
+
+parser = argparse.ArgumentParser(description="Photo pipeline: k-means palette in Oklab, three dithering variants.")
+parser.add_argument("image", type=Path, help="path to the input photograph")
+args = parser.parse_args()
+
 # ---- load and downscale
-im = Image.open("/mnt/user-data/uploads/45640.jpeg").convert("RGB")
+im = Image.open(args.image).convert("RGB")
 scale = 320 / max(im.size)
 im = im.resize((round(im.size[0]*scale), round(im.size[1]*scale)), Image.LANCZOS)
 rgb = np.asarray(im, dtype=np.float64) / 255.0
@@ -100,7 +117,7 @@ import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 def to_rgb(lab): return np.clip(oklab_to_srgb(lab),0,1)
 
-# crop around the eyes: roughly upper third, centred
+# crop around the eyes: roughly upper third, centered
 cy, cx = int(H*0.30), int(W*0.52)
 s = 64
 crop = (slice(cy-s//2, cy+s//2), slice(cx-s, cx+s))
@@ -117,11 +134,11 @@ fig.subplots_adjust(bottom=0.10)
 strip = fig.add_axes([0.25, 0.03, 0.5, 0.035])
 strip.imshow(to_rgb(palette[None,:,:]), aspect="auto"); strip.set_yticks([])
 strip.set_xticks(range(N)); strip.set_xticklabels([f"{100*c:.0f}%" for c in counts], fontsize=7)
-strip.set_title("extracted 10-colour Oklab palette (share of pixels)", fontsize=9)
+strip.set_title("extracted 10-color Oklab palette (share of pixels)", fontsize=9)
 fig.suptitle("Photo, k-means palette: baseline vs palette-structure-aware error diffusion", fontsize=12)
-fig.savefig("/home/claude/photo_comparison.png", dpi=130, bbox_inches="tight")
+fig.savefig(OUT / "photo_comparison.png", dpi=130, bbox_inches="tight")
 print("figure written")
 
 # save individual full-res-of-working-size dithers too
 for m in names:
-    Image.fromarray((to_rgb(results[m])*255).round().astype(np.uint8)).save(f"/home/claude/photo_{m}.png")
+    Image.fromarray((to_rgb(results[m])*255).round().astype(np.uint8)).save(OUT / f"photo_{m}.png")

@@ -23,9 +23,11 @@ def test_extract_palette_shares_descending():
 
 
 def test_extract_palette_missing_raise_on_degenerate_image():
-    """Requesting more colours than the image actually has should be
-    reportable as an error when the caller asks for it, rather than only
-    ever silently returning a duplicate, 0%-share colour."""
+    """Requesting more colors than the image has should be reportable as an error.
+
+    With missing="raise" the caller gets an error instead of the default
+    warning plus a duplicate, 0%-share color.
+    """
     flat_image = np.zeros((10, 10, 3))
     with pytest.raises(Exception):
         extract_palette(flat_image, n_colours=5, seed=0, missing="raise")
@@ -48,8 +50,10 @@ def test_describe_palette_isotropic_says_little_to_do():
 
 
 def test_describe_palette_rank_deficient_says_real_extent_and_flat():
-    """The standard nine-colour rank-deficient palette (b held constant)
-    has real extent in two of three directions and is flat in the third."""
+    """The standard nine-color palette with b held constant is rank-deficient.
+
+    It has real extent in two of three directions and is flat in the third.
+    """
     Ls, As = [0.40, 0.55, 0.70], [-0.08, 0.00, 0.08]
     palette = np.array([[L, a, 0.02] for L in Ls for a in As])
     description = describe_palette(palette, eps=0.02 ** 2)
@@ -59,16 +63,22 @@ def test_describe_palette_rank_deficient_says_real_extent_and_flat():
 
 
 def test_describe_palette_fully_degenerate_palette():
-    """A palette with zero spread in every direction (two identical
-    colours) should be described as such, not as a division-by-zero crash."""
+    """A zero-spread palette (two identical colors) must not crash describe_palette.
+
+    It should be described as having almost no spread, not met with a
+    division-by-zero.
+    """
     palette = np.array([[0.5, 0.0, 0.0], [0.5, 0.0, 0.0]])
     description = describe_palette(palette, eps=0.02 ** 2)
     assert "almost no measurable spread" in description
 
 
 def test_describe_palette_does_not_recommend_an_eps_value():
-    """The function must describe geometry relative to the given eps, not
-    tell the caller what eps should be; that heuristic is not yet settled."""
+    """The function must describe geometry relative to the given eps.
+
+    It must not tell the caller what eps should be; that heuristic is not
+    yet settled.
+    """
     rng = np.random.default_rng(6)
     palette = rng.normal(size=(10, 3))
     description = describe_palette(palette)
@@ -85,8 +95,11 @@ def test_describe_palette_reports_uniform_locality_for_isotropic_palette():
 
 
 def test_eigenspectrum_report_per_cell_false_skips_per_cell_cost():
-    """per_cell=False should return global eigenvalues without computing
-    per-cell gains (which are O(n²)). The per-cell fields become zero."""
+    """per_cell=False should return global eigenvalues without per-cell gains.
+
+    The O(n²) per-cell computation is skipped and the per-cell fields come
+    back as zero.
+    """
     Ls, As = [0.40, 0.55, 0.70], [-0.08, 0.00, 0.08]
     palette = np.array([[L, a, 0.02] for L in Ls for a in As])
     report = eigenspectrum_report(palette, per_cell=False)

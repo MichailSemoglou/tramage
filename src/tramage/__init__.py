@@ -1,6 +1,6 @@
 """Tramage: palette-structure-aware error diffusion dithering.
 
-Standard vector error diffusion propagates the full quantisation error.
+Standard vector error diffusion propagates the full quantization error.
 Tramage instead reshapes that error along the palette's own geometry in
 Oklab before propagating it, so error is passed through where the palette
 has room for it and damped where it does not. See the project README and

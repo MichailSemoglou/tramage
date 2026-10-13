@@ -32,21 +32,22 @@ def extract_palette(
     image:
         Oklab image, shape ``(H, W, 3)``.
     n_colours:
-        Number of palette colours to extract.
+        Number of palette colors to extract.
     seed:
-        Seed for the k-means initialisation, for reproducible palettes.
+        Seed for the k-means initialization, for reproducible palettes.
     missing:
         How to handle an empty cluster (`n_colours` larger than the image's
-        actual colour diversity produces one). ``"warn"`` (the default)
+        actual color diversity produces one). ``"warn"`` (the default)
         keeps that centroid at its initial position with a 0% share and
         prints a warning; ``"raise"`` raises instead, if a duplicate,
-        0%-share colour in the palette would be a problem for the caller.
+        0%-share color in the palette would be a problem for the caller.
 
     Returns
     -------
     A tuple ``(palette, shares)``: the cluster centroids in Oklab, ordered
-    by descending share of pixels, and each colour's share as a fraction of
+    by descending share of pixels, and each color's share as a fraction of
     the total pixel count.
+
     """
     pixels = np.asarray(image, dtype=np.float64).reshape(-1, 3)
     centroids, labels = kmeans2(pixels, n_colours, minit="++", seed=seed, missing=missing)
@@ -66,11 +67,18 @@ class EigenspectrumReport:
     gains:
         Global shaping gain for each eigenvalue, ``lambda / (lambda + eps)``.
     per_cell_gain_min, per_cell_gain_max:
-        Elementwise minimum and maximum, across palette colours, of the
+        Elementwise minimum and maximum, across palette colors, of the
         per-cell gains from :func:`tramage.shaping.per_cell_shaping_matrices`.
         A wide range between them means the palette's local structure
         varies across the gamut; a narrow range means the palette is
-        roughly self-similar everywhere.
+        roughly self-similar everywhere. When :func:`eigenspectrum_report`
+        is called with ``per_cell=False``, both are filled with zeros: a
+        documented fallback for the skipped computation, not measured
+        gains.
+    eps:
+        Variance scale below which an axis is treated as degenerate; the
+        value the gains were computed with.
+
     """
 
     eigenvalues: FloatArray
@@ -105,16 +113,18 @@ def eigenspectrum_report(
     Parameters
     ----------
     palette:
-        Palette colours in Oklab, shape ``(n, 3)``.
+        Palette colors in Oklab, shape ``(n, 3)``.
     k:
-        Number of neighbours for per-cell shaping matrices.
+        Number of neighbors for per-cell shaping matrices.
     eps:
         Variance scale below which an axis is treated as degenerate.
     per_cell:
         If ``True`` (default), also computes per-cell shaping matrices so
         ``per_cell_gain_min`` and ``per_cell_gain_max`` are populated.
         Set ``False`` to skip the O(n²) per-cell cost when only the
-        global eigenspectrum is needed.
+        global eigenspectrum is needed; the two per-cell fields are then
+        zero-filled, a documented fallback rather than measured data.
+
     """
     _, eigenvalues, gains = global_shaping_matrix(palette, eps=eps)
     if per_cell:
@@ -135,10 +145,10 @@ def eigenspectrum_report(
 # gains at or above this are treated as "real extent". Between the two is
 # reported as "partial". These are descriptive bands for plain-language
 # reporting, not a tuning recommendation for eps itself. The values 0.3
-# and 0.7 are chosen so that directions whose variance is within an order
-# of magnitude of eps (gain ≈ 0.5) are described as "partial" rather than
-# given a definitive label, while directions clearly above or below that
-# threshold get a clear characterisation.
+# and 0.7 are chosen so that directions whose variance is within roughly
+# a factor of two of eps (gain ≈ 0.5 at variance = eps) are described as
+# "partial" rather than given a definitive label, while directions clearly
+# above or below that threshold get a clear characterization.
 _FLAT_GAIN = 0.3
 _REAL_EXTENT_GAIN = 0.7
 
@@ -160,7 +170,7 @@ def describe_palette(
     This describes the palette's geometry relative to the `eps` supplied
     (the default if none is given). It does not recommend a value for
     `eps`; choosing one well is an open question this project is still
-    characterising (see docs/mathematical-appendix.md and
+    characterizing (see docs/mathematical-appendix.md and
     experiments/README.md), and asserting a tuning rule here would get
     ahead of that work.
     """
@@ -172,7 +182,7 @@ def describe_palette(
 
     if n_flat == 0:
         shape_sentence = (
-            f"This {n}-colour palette has real extent in all three directions "
+            f"This {n}-color palette has real extent in all three directions "
             f"in Oklab, relative to eps={eps:g}."
         )
         effect_sentence = (
@@ -182,7 +192,7 @@ def describe_palette(
         )
     elif n_real == 0:
         shape_sentence = (
-            f"This {n}-colour palette has almost no measurable spread in any "
+            f"This {n}-color palette has almost no measurable spread in any "
             f"direction in Oklab, relative to eps={eps:g}."
         )
         effect_sentence = (
@@ -192,7 +202,7 @@ def describe_palette(
         )
     else:
         shape_sentence = (
-            f"This {n}-colour palette has real extent in {n_real} of 3 "
+            f"This {n}-color palette has real extent in {n_real} of 3 "
             f"directions in Oklab, with {n_flat} close to flat, relative to "
             f"eps={eps:g}."
         )

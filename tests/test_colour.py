@@ -1,4 +1,8 @@
-"""Round-trip tests for sRGB <-> Oklab conversion."""
+"""Tests for color conversion.
+
+sRGB <-> Oklab round trips, in_gamut bounds checks, the srgb_to_linear
+negative-input warning contract, and the CIELAB (D65) suite.
+"""
 
 import warnings
 
@@ -45,7 +49,7 @@ def test_in_gamut_true_for_srgb_primaries():
 
 
 def test_in_gamut_false_outside_srgb_cube():
-    # Push a valid colour's lightness far out of range in Oklab.
+    # Push a valid color's lightness far out of range in Oklab.
     lab = srgb_to_oklab(np.array([0.5, 0.5, 0.5]))
     out_of_gamut = lab.copy()
     out_of_gamut[0] = 5.0
@@ -53,9 +57,10 @@ def test_in_gamut_false_outside_srgb_cube():
 
 
 def test_srgb_to_linear_no_warning_for_negative_input():
-    """Negative input beyond -0.055 previously raised a spurious RuntimeWarning
-    from the unused branch of np.where, even though the selected result was
-    already correct.
+    """Negative input must not warn.
+
+    np.where evaluates both branches, so the power branch is fed a
+    clipped copy (see colour.srgb_to_linear).
     """
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -102,10 +107,11 @@ def test_cielab_black_and_white_round_trip():
 
 
 def test_cielab_midgray_anchor():
-    """sRGB [0.5, 0.5, 0.5] maps to L* ~ 53.39, the standard published value
-    for mid-gray under D65. Anchors the implementation to an external
-    reference, not just round-trip closure (which a sign-flipped matrix
-    could also pass)."""
+    """Mid-gray sRGB [0.5, 0.5, 0.5] maps to L* ~ 53.39, the standard published D65 value.
+
+    Anchors the implementation to an external reference, not just
+    round-trip closure (which a sign-flipped matrix could also pass).
+    """
     lab = srgb_to_cielab(np.array([0.5, 0.5, 0.5]))
     assert np.isclose(lab[0], 53.39, atol=0.05)
     assert np.isclose(lab[1], 0.0, atol=0.01)

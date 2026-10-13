@@ -43,7 +43,7 @@ This is an honest account of where the method is weak, not just where it is stro
 - `src/tramage/`: the package. `colour.py` (sRGB and Oklab conversion), `shaping.py` (matrix construction), `diffusion.py` (serpentine error diffusion), `metrics.py` (fidelity and noise measures), `palette.py` (palette extraction and eigenspectrum reporting).
 - `prototypes/`: the original research scripts, kept verbatim as the historical record of the work.
 - `experiments/`: the evaluation harness and results — 124 images (Kodak + CQ100): dithering quality, filter baselines (KB/DV), palette geometry, colour space.
-- `gallery/`: before-and-after comparisons, reproducible from the package’s public API.
+- `gallery/`: before-and-after comparisons, reproducible using only the installed package (no prototype code).
 - `docs/`: a quickstart, a plain-language explanation for designers, and the mathematical appendix.
 - `PREREGISTRATION.md`: the analysis plan as written. The numbers it cites (e.g. the 45% worm cost) predate the 124-image re-run and are kept unchanged as the historical record; treat any discrepancy with `experiments/` results as provenance, not error.
 - `tests/`: round-trip colour conversion, the isotropic limit, the inertness lemma, and energy conservation of the diffusion kernel.

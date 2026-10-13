@@ -46,7 +46,7 @@ def test_inertness_exactly_degenerate_palette():
     assert np.isclose(eigenvalues.min(), 0.0, atol=1e-12)
     assert np.isclose(gains.min(), 0.0, atol=1e-12)
 
-    # The degenerate direction here is the b axis, since every colour sits
+    # The degenerate direction here is the b axis, since every color sits
     # on b = b_plane. Error purely along b should be mapped to (near) zero.
     off_plane_error = np.array([0.0, 0.0, 1.0])
     shaped = M @ off_plane_error
@@ -71,11 +71,9 @@ def test_shaping_matrix_is_symmetric():
 
 
 def test_per_cell_shaping_rejects_single_colour_palette():
-    """A palette of 1 colour has no neighbours to build a local matrix from.
+    """A palette of 1 color has no neighbors to build a local matrix from.
 
-    Previously this silently produced a NaN covariance and failed deep
-    inside `np.linalg.eigh` with a confusing `LinAlgError`; it should raise
-    a clear, immediate error instead.
+    So it must raise a clear ValueError at the API boundary.
     """
     palette = np.array([[0.5, 0.0, 0.0]])
     with pytest.raises(ValueError, match="at least 2"):
@@ -83,7 +81,7 @@ def test_per_cell_shaping_rejects_single_colour_palette():
 
 
 def test_per_cell_shaping_rejects_k_of_zero():
-    """k=0 would otherwise resolve to an empty neighbour set; reject it explicitly."""
+    """k=0 would otherwise resolve to an empty neighbor set; reject it explicitly."""
     rng = np.random.default_rng(13)
     palette = rng.normal(size=(10, 3))
     with pytest.raises(ValueError, match="k must be"):
@@ -91,7 +89,11 @@ def test_per_cell_shaping_rejects_k_of_zero():
 
 
 def test_gain_rejects_non_positive_eps():
-    """eps=0 with an exactly-zero eigenvalue previously produced a silent NaN gain."""
+    """Eps must be positive.
+
+    eps=0 with an exactly-zero eigenvalue would make the gain 0/0, so
+    non-positive eps is rejected.
+    """
     with pytest.raises(ValueError):
         gain(np.array([0.0, 1e-4, 0.5]), eps=0.0)
     with pytest.raises(ValueError):
@@ -99,18 +101,23 @@ def test_gain_rejects_non_positive_eps():
 
 
 def test_shaping_matrix_rejects_empty_points():
-    """Calling shaping_matrix on an empty array should raise a clear error,
-    not a cryptic division-by-zero."""
+    """Calling shaping_matrix on an empty array should raise a clear error.
+
+    The failure must name the problem, not surface as a cryptic
+    division-by-zero.
+    """
     with pytest.raises(ValueError, match="at least one point"):
         shaping_matrix(np.empty((0, 3)))
 
 
 def test_global_shaping_matrix_golden_value():
-    """Hand-computed golden value. For a palette spread only along L, the
-    population covariance has a single non-zero eigenvalue lam = var(L)
-    = 0.02/3, so the shaping matrix is diag(g, 0, 0) with g = lam/(lam+eps).
-    Pins the exact construction (population covariance, absolute eps scale)
-    against silent edits."""
+    """Hand-computed golden value.
+
+    For a palette spread only along L, the population covariance has a
+    single non-zero eigenvalue lam = var(L) = 0.02/3, so the shaping matrix
+    is diag(g, 0, 0) with g = lam/(lam+eps). Pins the exact construction
+    (population covariance, absolute eps scale) against silent edits.
+    """
     palette = np.array([[0.5, 0.0, 0.0], [0.6, 0.0, 0.0], [0.7, 0.0, 0.0]])
     eps = 0.001
     lam = 0.02 / 3.0

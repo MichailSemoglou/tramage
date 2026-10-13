@@ -2,9 +2,9 @@
 
 For each image x K x seed, this script extracts a k-means palette in Oklab
 and records the eigenstructure that :mod:`tramage.shaping` would act on, so
-the Phase 1 reframing question -- "are extracted palettes consistently
-near-degenerate in Oklab, or is near-degeneracy the exception?" -- can be
-answered from data rather than assertion.
+the question -- "are extracted palettes consistently near-degenerate in
+Oklab, or is near-degeneracy the exception?" -- can be answered from data
+rather than assertion.
 
 No new method code is exercised here. The functions called are the package's
 public API: :func:`tramage.palette.extract_palette` and
@@ -28,11 +28,10 @@ from tramage._harness import corpus_dirs, finalise_csv, images_in, load_done, lo
 from tramage.palette import _FLAT_GAIN, _REAL_EXTENT_GAIN, eigenspectrum_report, extract_palette
 from tramage.shaping import DEFAULT_EPS
 
-# K values span the small-palette regime where shaping is hypothesised to
+# K values span the small-palette regime where shaping is hypothesized to
 # matter (designer-palette territory: riso, duotone, brand sets) through to
-# the large-palette regime where classical CQ typically lives. The
-# reframing question is precisely whether near-degeneracy survives as K
-# grows.
+# the large-palette regime where classical CQ typically lives. The question
+# is precisely whether near-degeneracy survives as K grows.
 KS: tuple[int, ...] = (8, 16, 32, 64, 128, 256)
 SEEDS: tuple[int, ...] = (0, 1, 2)
 
@@ -106,7 +105,7 @@ def main() -> None:
         for corpus in corpora:
             images = images_in(corpus)
             if not images:
-                print(f"[skip] {corpus.name}: no .png/.jpg images", flush=True)
+                print(f"[skip] {corpus.name}: no .png/.jpg/.ppm images", flush=True)
                 continue
             print(f"[corpus] {corpus.name}: {len(images)} images", flush=True)
 

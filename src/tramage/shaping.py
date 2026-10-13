@@ -1,11 +1,11 @@
 """Construction of palette-structure-aware error-shaping matrices.
 
 The central idea: a palette's own covariance in Oklab tells you which
-directions in colour space it can actually represent. Where the palette has
-real extent, quantisation error in that direction is payable, later pixels
+directions in color space it can actually represent. Where the palette has
+real extent, quantization error in that direction is payable: later pixels
 can use it to correct the running total. Where the palette is flat or
 nearly flat, error in that direction is not payable: it does not change
-which palette colour is nearest, so propagating it only adds noise.
+which palette color is nearest, so propagating it only adds noise.
 
 Given a set of palette points, compute the covariance matrix, eigendecompose
 it, and shrink each eigenvalue to a gain via ``g(lambda) = lambda / (lambda +
@@ -20,8 +20,8 @@ Two variants are provided:
 
 - :func:`global_shaping_matrix`, a single matrix from the whole palette's
   covariance.
-- :func:`per_cell_shaping_matrices`, one matrix per palette colour, built
-  from that colour's `k` nearest palette neighbours. This adapts to
+- :func:`per_cell_shaping_matrices`, one matrix per palette color, built
+  from that color's `k` nearest palette neighbors. This adapts to
   palettes whose local structure varies across the gamut (a palette that is
   globally three-dimensional but locally flat in one region, for example).
 """
@@ -35,11 +35,22 @@ from numpy.typing import NDArray
 
 from .colour import FloatArray
 
+# Default variance scale below which a palette axis is treated as
+# degenerate: an absolute scale in Oklab-variance units, not normalized by
+# palette extent (docs/mathematical-appendix.md). As a standard deviation
+# this is 0.02 in Oklab units.
 DEFAULT_EPS = 0.02 ** 2
 
 
 def gain(eigenvalues: FloatArray, eps: float) -> FloatArray:
-    """Shrinkage gain ``lambda / (lambda + eps)`` for each eigenvalue."""
+    """Shrinkage gain ``lambda / (lambda + eps)`` for each eigenvalue.
+
+    Raises
+    ------
+    ValueError
+        If `eps` is not positive.
+
+    """
     if eps <= 0:
         raise ValueError(f"eps must be > 0, got {eps!r}")
     return eigenvalues / (eigenvalues + eps)
@@ -55,14 +66,14 @@ def shaping_matrix(
     Parameters
     ----------
     points:
-        Colours in Oklab, shape ``(n, 3)``, whose covariance defines the
+        Colors in Oklab, shape ``(n, 3)``, whose covariance defines the
         shaping. For the global variant these are the whole palette; for
-        the per-cell variant they are one colour's nearest neighbours.
+        the per-cell variant they are one color's nearest neighbors.
     centre:
         Point to measure spread around. Defaults to the mean of `points`.
-        The per-cell variant passes the palette colour itself, so the
-        matrix reflects local extent around that colour rather than the
-        mean of its neighbourhood.
+        The per-cell variant passes the palette color itself, so the
+        matrix reflects local extent around that color rather than the
+        mean of its neighborhood.
     eps:
         Variance scale below which an axis is treated as degenerate.
 
@@ -70,6 +81,12 @@ def shaping_matrix(
     -------
     A tuple ``(M, eigenvalues, gains)``: the shaping matrix, the
     eigenvalues of the covariance, and the gain applied to each.
+
+    Raises
+    ------
+    ValueError
+        If `points` is empty.
+
     """
     points = np.asarray(points, dtype=np.float64)
     n = len(points)
@@ -96,33 +113,51 @@ def per_cell_shaping_matrices(
     k: int = 4,
     eps: float = DEFAULT_EPS,
 ) -> tuple[NDArray[np.float64], list[FloatArray], list[FloatArray]]:
-    """One shaping matrix per palette colour, from its `k` nearest neighbours.
+    """One shaping matrix per palette color, from its `k` nearest neighbors.
 
-    Nearest neighbours in the palette itself stand in for a Delaunay
-    neighbourhood, which is what local shaping would ideally use. Delaunay
+    Nearest neighbors in the palette itself stand in for a Delaunay
+    neighborhood, which is what local shaping would ideally use. Delaunay
     triangulation degenerates for rank-deficient palettes (all points on a
-    plane or line), while k-nearest-neighbours does not, so it is the more
+    plane or line), while k-nearest-neighbors does not, so it is the more
     robust choice here.
+
+    Parameters
+    ----------
+    palette:
+        Palette colors in Oklab, shape ``(n, 3)``.
+    k:
+        Number of nearest palette neighbors used to build each color's
+        local covariance. Capped at ``n - 1``. A capped value below 3
+        leaves the local covariance low-rank; the function warns and
+        proceeds with it.
+    eps:
+        Variance scale below which an axis is treated as degenerate.
 
     Returns
     -------
     A tuple ``(matrices, eigenvalues, gains)``: `matrices` has shape
-    ``(n, 3, 3)``; `eigenvalues` and `gains` are lists of per-colour arrays,
+    ``(n, 3, 3)``; `eigenvalues` and `gains` are lists of per-color arrays,
     each of length 3, in palette order.
+
+    Raises
+    ------
+    ValueError
+        If `palette` has fewer than 2 colors, or `k` is less than 1.
+
     """
     palette = np.asarray(palette, dtype=np.float64)
     n = len(palette)
     if n < 2:
-        raise ValueError("per-cell shaping requires at least 2 palette colours")
+        raise ValueError("per-cell shaping requires at least 2 palette colors")
     if k < 1:
         raise ValueError(f"k must be >= 1, got {k!r}")
     k = min(k, n - 1)
     if k < 3:
         warnings.warn(
-            f"per-cell shaping with only {k} neighbour(s) per colour "
-            f"(palette has {n} colours) will produce low-rank local "
+            f"per-cell shaping with only {k} neighbor(s) per color "
+            f"(palette has {n} colors) will produce low-rank local "
             f"covariances; per-cell shaping works best with at least "
-            f"k+1 palette colours",
+            f"k+1 palette colors",
             stacklevel=2,
         )
     matrices = np.zeros((n, 3, 3))

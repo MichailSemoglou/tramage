@@ -68,6 +68,17 @@ def blurred_tone_error(
     Blurring approximates how the eye averages a dither pattern at normal
     viewing distance, so this measures whether the *tone* the dither
     reproduces (rather than the pixel-exact error) matches the original.
+
+    Parameters
+    ----------
+    dithered:
+        Dithered output in Oklab, shape ``(H, W, 3)``.
+    original:
+        Continuous-tone original in Oklab, shape ``(H, W, 3)``.
+    sigma:
+        Standard deviation of the Gaussian blur kernel, in pixels
+        (default 1.5 px).
+
     """
     channels = dithered.shape[-1]
     blurred_dithered = np.stack(
@@ -92,6 +103,20 @@ def lowfreq_energy_fraction(
     noise that is visually inert at normal viewing distance. This returns
     the share of spectral power inside a disc of radius `radius_frac` times
     the Nyquist frequency, excluding the DC term.
+
+    Parameters
+    ----------
+    dithered:
+        Dithered output in Oklab, shape ``(H, W, 3)``.
+    original:
+        Continuous-tone original in Oklab, shape ``(H, W, 3)``.
+    channel:
+        Channel index (0 = L, 1 = a, 2 = b) whose error spectrum is
+        measured.
+    radius_frac:
+        Radius of the low-frequency disc as a fraction of the Nyquist
+        frequency (default 0.10).
+
     """
     e = error(dithered, original)[..., channel]
     e = e - e.mean()
@@ -118,13 +143,29 @@ def spectral_anisotropy(
     """Angular non-uniformity of a channel's error spectrum in a frequency band.
 
     A well-behaved diffusion pattern spreads error roughly evenly across
-    orientation within the mid-frequency band; directional artefacts (from
+    orientation within the mid-frequency band; directional artifacts (from
     serpentine scanning bias, for example) show up as an uneven angular
     profile. Returns the coefficient of variation of spectral power across
     `bins` angular bins: 0 means every orientation carries equal power, and 1
     means the angular standard deviation equals the angular mean (strongly
     directional). Values can exceed 1 for highly peaked spectra; the scale is
-    relative, not normalised to a fixed maximum.
+    relative, not normalized to a fixed maximum.
+
+    Parameters
+    ----------
+    dithered:
+        Dithered output in Oklab, shape ``(H, W, 3)``.
+    original:
+        Continuous-tone original in Oklab, shape ``(H, W, 3)``.
+    channel:
+        Channel index (0 = L, 1 = a, 2 = b) whose error spectrum is
+        measured.
+    band:
+        ``(low, high)`` radial-frequency limits of the measured band, as
+        fractions of the Nyquist frequency (default ``(0.15, 0.45)``).
+    bins:
+        Number of angular bins the band is divided into (default 18).
+
     """
     e = error(dithered, original)[..., channel]
     e = e - e.mean()
@@ -146,19 +187,19 @@ def spectral_anisotropy(
 
 # --- S-CIELAB (Zhang & Wandell 1997) ----------------------------------------
 #
-# S-CIELAB applies spatial pre-filtering in an opponent colour space before
+# S-CIELAB applies spatial pre-filtering in an opponent color space before
 # computing CIELAB ΔE, so that the metric accounts for the human visual
-# system's reduced sensitivity to high-spatial-frequency colour variations.
+# system's reduced sensitivity to high-spatial-frequency color variations.
 # This is the standard perceptual metric for halftoning and error-diffusion
 # comparisons (Damera-Venkata & Evans 2001, Kite-Evans-Bovik 2000).
 #
 # The implementation uses:
-#   - The Poirson & Wandell (1996) pattern-colour separable opponent matrix
+#   - The Poirson & Wandell (1996) pattern-color separable opponent matrix
 #     to convert XYZ → opponent (luminance O1, red-green O2, blue-yellow O3).
 #   - The tabulated S-CIELAB spatial filters (Zhang & Wandell 1997,
 #     Appendix A): per opponent channel, a weighted sum of unit-volume 2D
-#     Gaussians with the published spreads, each lobe normalised to unit
-#     sum and the composite normalised to unit DC gain. The luminance
+#     Gaussians with the published spreads, each lobe normalized to unit
+#     sum and the composite normalized to unit DC gain. The luminance
 #     filter's third lobe carries a negative weight, giving the bandpass
 #     surround of the luminance CSF.
 #   - Standard CIELAB ΔE (CIE76) on the filtered images.
@@ -166,7 +207,7 @@ def spectral_anisotropy(
 # A single-Gaussian approximation of the filters (luminance: the narrowest
 # published lobe only; chrominance: one shared spread, dropping the
 # red-green/blue-yellow distinction) is retained as ``filters="gaussian"``
-# for comparison with earlier runs; it is not the metric the paper reports.
+# for comparison; it is not the metric the paper reports.
 
 # (Opponent matrix, D65 white point, CIELAB constants, and the filter
 # parameters live in tramage._constants and are imported at the top of the
@@ -280,9 +321,9 @@ def scielab_de(
     """S-CIELAB ΔE between dithered and original images (both in Oklab).
 
     Applies the opponent-space spatial pre-filtering of Zhang & Wandell
-    (1997) — the human contrast sensitivity functions per opponent channel —
+    (1997), the human contrast sensitivity functions per opponent channel,
     before computing standard CIELAB ΔE (CIE76). This is the metric the
-    halftoning literature trusts for perceptual image quality: it penalises
+    halftoning literature trusts for perceptual image quality: it penalizes
     visible structured error while discounting high-frequency noise the eye
     cannot resolve.
 
@@ -297,7 +338,7 @@ def scielab_de(
         with `viewing_distance_cm` this determines the spatial extent of
         the contrast sensitivity filters in pixel units.
     viewing_distance_cm:
-        Typical viewing distance in centimetres. The defaults (100 DPI,
+        Typical viewing distance in centimeters. The defaults (100 DPI,
         40 cm) place 27.5 pixels per degree of visual angle. The
         Kolpatzik-Bouman filters in :mod:`tramage.kb_filter` were designed
         at a 0.0317°/pixel sampling rate (31.5 pixels per degree at 40 cm,
@@ -308,24 +349,28 @@ def scielab_de(
         If ``True``, returns a dict with ``"mean"``, ``"p95"``, and
         ``"max"``.
     filters:
-        ``"zhang1997"`` (default) applies the tabulated S-CIELAB kernels —
+        ``"zhang1997"`` (default) applies the tabulated S-CIELAB kernels:
         weighted sums of the published Gaussians per opponent channel,
         including the luminance bandpass surround. ``"gaussian"`` applies
-        the single-Gaussian approximation this package used before the
-        kernels were tabulated; retained for comparison with earlier
-        result CSVs, not for reporting.
+        the single-Gaussian approximation of the S-CIELAB kernels;
+        retained for comparison, not for reporting.
 
     Returns
     -------
     ``float`` or ``dict``
         Mean S-CIELAB ΔE, or summary dict if ``full=True``.
 
+    Raises
+    ------
+    ValueError
+        If `filters` is neither ``"zhang1997"`` nor ``"gaussian"``.
+
     Notes
     -----
-    The corpus result CSVs produced before 29 August 2026 were computed
-    with ``filters="gaussian"``. The two paths share the opponent
-    transform, viewing geometry, and CIE76 differencing; they differ only
-    in the spatial kernels.
+    The two ``filters`` paths share the opponent transform, viewing
+    geometry, and CIE76 differencing; they differ only in the spatial
+    kernels.
+
     """
     xyz_dithered = oklab_to_xyz(dithered)
     xyz_original = oklab_to_xyz(original)

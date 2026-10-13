@@ -2,10 +2,10 @@
 
 Two figures, each designed to land a specific claim:
 
-- ``metrics_vs_K.png`` -- three panels (noise_L, tone_error, lowfreq_frac),
-  three lines per panel (baseline/global/cell), with 25-75% shaded bands
-  across images. The headline plot: at a glance, does shaped sit below
-  baseline?
+- ``metrics_vs_K.png`` -- four panels (noise_L, tone_error, lowfreq_frac,
+  scielab_de), three lines per panel (baseline/global/cell), with 25-75%
+  shaded bands across images. The headline plot: at a glance, does shaped
+  sit below baseline?
 - ``gain_vs_geometry.png`` -- a scatter joining this CSV to the geometry
   CSV on (image, K). X = continuous degeneracy score
   ``(lambda1+lambda2)/lambda3``; Y = relative improvement
@@ -43,11 +43,11 @@ GEOMETRY_CSV = HERE.parent / "palette_geometry" / "results" / "palette_geometry.
 
 VARIANT_COLORS = {"baseline": "#888888", "global": "#2c3e60", "cell": "#b94a48"}
 VARIANT_ORDER = ["baseline", "global", "cell"]
-METRICS = [
-    ("noise_L", "L-channel noise (std of error)", False),  # lower is better
-    ("tone_error", "blurred tone error (Oklab dE)", False),
-    ("lowfreq_frac", "low-frequency error fraction", False),
-    ("scielab_de", "S-CIELAB ΔE (perceptual)", False),
+METRICS = [  # lower is better for all four
+    ("noise_L", "L-channel noise (std of error)"),
+    ("tone_error", "blurred tone error (Oklab dE)"),
+    ("lowfreq_frac", "low-frequency error fraction"),
+    ("scielab_de", "S-CIELAB ΔE (perceptual)"),
 ]
 
 
@@ -60,12 +60,12 @@ def _load_quality() -> list[dict]:
 
 
 def plot_metrics_vs_K(rows: list[dict]) -> None:
+    """Metrics by K: median line per variant with a 25-75% band across images."""
     Ks = sorted({int(row["K"]) for row in rows})
 
     fig, axes = plt.subplots(1, len(METRICS), figsize=(14, 4.6), sharey=False)
-    for ax, (metric, label, _) in zip(axes, METRICS):
+    for ax, (metric, label) in zip(axes, METRICS):
         for variant in VARIANT_ORDER:
-            # Per-K: collect this metric across all images for this variant.
             medians, p25s, p75s = [], [], []
             for K in Ks:
                 vals = np.array([
@@ -83,8 +83,8 @@ def plot_metrics_vs_K(rows: list[dict]) -> None:
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
     axes[0].legend(title="variant", fontsize=9)
-    fig.suptitle("Kodak dithering quality by K: baseline vs global vs per-cell shaping\n"
-                 "(line = median across 24 images; band = 25-75 percentile)",
+    fig.suptitle("Dithering quality by K: baseline vs global vs per-cell shaping\n"
+                 "(line = median across 124 images, Kodak24 + CQ100; band = 25-75 percentile)",
                  fontsize=11)
     fig.tight_layout()
     fig.savefig(RESULTS / "metrics_vs_K.png", dpi=130)

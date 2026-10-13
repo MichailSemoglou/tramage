@@ -2,8 +2,8 @@
 
 `PREREGISTRATION.md` declares Kodak24 and CQ100 as pre-specified subgroups
 of the 124-image corpus. The pooled headline (median per-image reduction,
-sign test) can mask subgroup behaviour — at K=256 the pooled null hides
-uniform Kodak harm against a CQ100 gain — so this script reports, per K and
+sign test) can mask subgroup behavior: at K=256 the pooled null hides
+uniform Kodak harm against a CQ100 gain, so this script reports, per K and
 per group (pooled / kodak / cq100):
 
 - n images, median and mean per-image S-CIELAB ΔE reduction (%);

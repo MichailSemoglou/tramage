@@ -1,8 +1,10 @@
 """Plot CQ100 dithering-quality results: metrics by K, and gain vs palette geometry.
 
 Mirrors ``experiments/dithering_quality/plot_quality.py`` with CQ100-specific
-paths and an additional per-corpus (i.e., per-category when the dataset is
-organised into category subdirectories) breakdown.
+paths. The gain-vs-geometry scatter additionally needs
+``palette_geometry/results/palette_geometry.csv`` rows for these images; the
+script exits with an explicit message if the join is empty (for example when
+the geometry run covered only the Kodak corpus).
 
 Run from the repository root, after run_cq100.py::
 
@@ -31,11 +33,11 @@ GEOMETRY_CSV = HERE.parent / "palette_geometry" / "results" / "palette_geometry.
 
 VARIANT_COLORS = {"baseline": "#888888", "global": "#2c3e60", "cell": "#b94a48"}
 VARIANT_ORDER = ["baseline", "global", "cell"]
-METRICS = [
-    ("noise_L", "L-channel noise (std of error)", False),
-    ("tone_error", "blurred tone error (Oklab dE)", False),
-    ("lowfreq_frac", "low-frequency error fraction", False),
-    ("scielab_de", "S-CIELAB ΔE (perceptual)", False),
+METRICS = [  # lower is better for all four
+    ("noise_L", "L-channel noise (std of error)"),
+    ("tone_error", "blurred tone error (Oklab dE)"),
+    ("lowfreq_frac", "low-frequency error fraction"),
+    ("scielab_de", "S-CIELAB ΔE (perceptual)"),
 ]
 
 
@@ -48,10 +50,11 @@ def _load() -> list[dict]:
 
 
 def plot_metrics_vs_K(rows: list[dict]) -> None:
+    """Metrics by K: median line per variant with a 25-75% band across images."""
     Ks = sorted({int(row["K"]) for row in rows})
 
     fig, axes = plt.subplots(1, len(METRICS), figsize=(14, 4.6), sharey=False)
-    for ax, (metric, label, _) in zip(axes, METRICS):
+    for ax, (metric, label) in zip(axes, METRICS):
         for variant in VARIANT_ORDER:
             medians, p25s, p75s = [], [], []
             for K in Ks:
@@ -80,6 +83,7 @@ def plot_metrics_vs_K(rows: list[dict]) -> None:
 
 
 def plot_gain_vs_geometry(rows: list[dict]) -> None:
+    """Scatter: degeneracy score vs shaping's relative noise improvement."""
     if not GEOMETRY_CSV.exists():
         print(f"skipping gain_vs_geometry: {GEOMETRY_CSV} not found "
               f"(run palette_geometry/run_geometry.py first)")
@@ -100,6 +104,7 @@ def plot_gain_vs_geometry(rows: list[dict]) -> None:
         pivoted[key][row["variant"]] = row["noise_L"]
 
     fig, ax = plt.subplots(figsize=(7.5, 5.2))
+    n_points = 0
     for variant, color in (("global", "#2c3e60"), ("cell", "#b94a48")):
         xs, ys = [], []
         for key, variants in pivoted.items():
@@ -113,8 +118,16 @@ def plot_gain_vs_geometry(rows: list[dict]) -> None:
             improvement = 1.0 - variants[variant] / base
             xs.append(degeneracy[key])
             ys.append(improvement)
+        n_points += len(xs)
         ax.scatter(xs, ys, s=20, alpha=0.45, color=color, edgecolors="none",
                    label=f"{variant} shaping")
+
+    if n_points == 0:
+        raise SystemExit(
+            f"gain_vs_geometry: no (image, K) rows in {GEOMETRY_CSV} match the "
+            f"{CSV_PATH.name} images; run palette_geometry/run_geometry.py for "
+            "this corpus first."
+        )
 
     ax.axhline(0.0, color="#999", linestyle="--", linewidth=1)
     ax.text(ax.get_xlim()[1] * 0.9, 0.02, "shaped quieter  ↑",

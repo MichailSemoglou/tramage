@@ -1,14 +1,17 @@
-"""Check whether S-CIELAB dE and L-channel noise rank conditions the same way.
+r"""Check whether S-CIELAB dE and L-channel noise rank conditions the same way.
 
-This is the first analysis to run after the re-run (see PREREGISTRATION.md).
-It reads a dithering-quality CSV and reports, per corpus:
+This is the first analysis to run on the results (see PREREGISTRATION.md).
+It reads a dithering-quality CSV and reports, pooled over all rows (both
+corpora):
 
 - winner concordance: the fraction of (image, K) where the best condition by
   `noise_L` is also the best by `scielab_de`;
 - Spearman rho between `noise_L` and `scielab_de` over all (image, K, variant)
   rows;
-- Spearman rho between the two metrics' *shaping improvement*
-  (baseline - shaped) over (image, K).
+- Spearman rho between the two metrics' *shaping improvement*, computed from
+  the `baseline` and `global` variants as (baseline - global) per (image, K).
+  Groups where either variant is absent are skipped from the improvement
+  statistic.
 
 Agreement gives the planned paper (S-CIELAB carries the claim, Oklab metrics
 are the mechanism). Disagreement changes the paper's structure, so know which
@@ -16,7 +19,7 @@ one you have before writing.
 
 Run from the repository root::
 
-    python experiments/analyze_rank_agreement.py \\
+    python experiments/analyze_rank_agreement.py \
         experiments/dithering_quality/results/dithering_quality.csv
 """
 
@@ -46,7 +49,7 @@ def main() -> None:
         raise SystemExit("empty CSV")
     if "scielab_de" not in rows[0]:
         raise SystemExit(
-            f"{args.csv} has no scielab_de column — the re-run has not been done yet."
+            f"{args.csv} has no scielab_de column; re-run the experiment to regenerate it."
         )
 
     var_col = "variant" if "variant" in rows[0] else "config"

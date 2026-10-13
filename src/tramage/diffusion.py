@@ -2,11 +2,11 @@
 
 This is ordinary Floyd-Steinberg error diffusion in its serpentine
 (boustrophedon) form: alternate rows scan left-to-right and right-to-left,
-which halves the tendency of raster-only scanning to drag error in one
+which avoids the tendency of raster-only scanning to drag error in one
 horizontal direction. The only departure from the textbook algorithm is
-that the quantisation error is passed through a shaping step before it is
-distributed to neighbouring pixels. Pass ``shaping=None`` and this is
-exactly vector Floyd-Steinberg; pass a matrix or per-colour matrices from
+that the quantization error is passed through a shaping step before it is
+distributed to neighboring pixels. Pass ``shaping=None`` and this is
+exactly vector Floyd-Steinberg; pass a matrix or per-color matrices from
 :mod:`tramage.shaping` and the error is reshaped along the palette's own
 structure first.
 """
@@ -30,7 +30,7 @@ DEFAULT_WEIGHTS: tuple[tuple[int, int, float], ...] = (
 
 
 def nearest_palette_index(pixel: FloatArray, palette: FloatArray) -> int:
-    """Index of the palette colour closest to `pixel` in Euclidean distance."""
+    """Index of the palette color closest to `pixel` in Euclidean distance."""
     return int(np.argmin(((palette - pixel) ** 2).sum(axis=-1)))
 
 
@@ -75,20 +75,20 @@ def diffuse(
     weights: tuple[tuple[int, int, float], ...] = DEFAULT_WEIGHTS,
     serpentine: bool = True,
 ) -> tuple[FloatArray, np.ndarray]:
-    """Quantise `image` to `palette` by serpentine error diffusion.
+    """Quantize `image` to `palette` by serpentine error diffusion.
 
     Parameters
     ----------
     image:
-        Continuous-tone image in the same colour space as `palette` (Oklab,
+        Continuous-tone image in the same color space as `palette` (Oklab,
         in this package), shape ``(H, W, 3)``.
     palette:
-        Candidate colours, shape ``(n, 3)``.
+        Candidate colors, shape ``(n, 3)``.
     shaping:
         ``None`` for unshaped vector Floyd-Steinberg. A single ``(3, 3)``
         matrix to apply the same shaping everywhere (see
         :func:`tramage.shaping.global_shaping_matrix`). An ``(n, 3, 3)``
-        array to apply the matrix for the chosen palette colour at each
+        array to apply the matrix for the chosen palette color at each
         pixel (see :func:`tramage.shaping.per_cell_shaping_matrices`).
     weights:
         Error-diffusion kernel as ``(row offset, column offset, weight)``
@@ -99,8 +99,9 @@ def diffuse(
 
     Returns
     -------
-    A tuple ``(dithered, indices)``: the quantised image made of palette
-    colours, and the palette index chosen at each pixel.
+    A tuple ``(dithered, indices)``: the quantized image made of palette
+    colors, and the palette index chosen at each pixel.
+
     """
     image = np.asarray(image, dtype=np.float64)
     palette = np.asarray(palette, dtype=np.float64)

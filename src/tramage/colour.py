@@ -1,14 +1,16 @@
-"""Conversion between sRGB and Oklab.
+"""Conversion between sRGB and the perceptual spaces Oklab and CIELAB.
 
-Oklab is a perceptually uniform colour space designed so that Euclidean
-distance approximates perceived colour difference reasonably well across
+Plus the CIE XYZ path that S-CIELAB and the DV filter design build on.
+
+Oklab is a perceptually uniform color space designed so that Euclidean
+distance approximates perceived color difference reasonably well across
 the whole gamut. That property is what lets the rest of this package treat
-palette geometry (covariance, eigenvalues, nearest neighbours) as a
+palette geometry (covariance, eigenvalues, nearest neighbors) as a
 meaningful description of how much visual room a palette actually spans,
-rather than an artefact of whichever encoding the colours happened to
+rather than an artifact of whichever encoding the colors happened to
 arrive in.
 
-All functions operate on the last axis of an array, so a single colour of
+All functions operate on the last axis of an array, so a single color of
 shape ``(3,)`` and an image of shape ``(H, W, 3)`` both work.
 """
 
@@ -91,9 +93,13 @@ def srgb_to_oklab(rgb: FloatArray) -> FloatArray:
 def oklab_to_srgb(lab: FloatArray) -> FloatArray:
     """Convert Oklab back to gamma-encoded sRGB.
 
-    Values are not clipped to [0, 1]; colours outside the sRGB gamut come
-    back as out-of-range floats so callers can decide how to handle them
-    (see :func:`in_gamut`).
+    Only the lower bound is clipped: :func:`linear_to_srgb` clips negative
+    linear-light values to zero, while values above 1 pass through. Colors
+    outside the sRGB gamut can therefore come back as out-of-range floats
+    on the high side, so callers can decide how to handle them. For
+    out-of-gamut detection use :func:`in_gamut`, which checks the
+    linear-light values before the transfer function and so sees both
+    bounds.
     """
     lms_ = lab @ _OKLAB_TO_LMS.T
     lms = lms_ ** 3
@@ -102,15 +108,15 @@ def oklab_to_srgb(lab: FloatArray) -> FloatArray:
 
 
 def in_gamut(lab: FloatArray, tol: float = 1e-6) -> np.bool_ | NDArray[np.bool_]:
-    """Whether Oklab colour(s) fall inside the sRGB gamut, within `tol`.
+    """Whether Oklab color(s) fall inside the sRGB gamut, within `tol`.
 
     Checks the linear-light RGB values prior to the sRGB transfer function,
     since that is where the gamut boundary is a simple unit cube.
 
-    When `lab` is a 1-D array (a single colour of shape ``(3,)``), returns
-    a scalar ``np.bool_``. For any shape with ``ndim >= 2`` -- including a
-    single-pixel image of shape ``(1, 3)`` -- returns a 1-D array of
-    per-colour booleans.
+    When `lab` is a 1-D array (a single color of shape ``(3,)``), returns
+    a scalar ``np.bool_``. For any shape with ``ndim >= 2``, returns an
+    array of per-color booleans of shape ``lab.shape[:-1]``: one boolean
+    per color, so an image of shape ``(H, W, 3)`` yields an ``(H, W)`` map.
     """
     lab = np.asarray(lab, dtype=np.float64)
     lms_ = lab @ _OKLAB_TO_LMS.T
@@ -125,19 +131,19 @@ def in_gamut(lab: FloatArray, tol: float = 1e-6) -> np.bool_ | NDArray[np.bool_]
 # CIELAB is the field's default perceptual space (Kolpatzik & Bouman 1995,
 # Orchard & Bouman 1991, Damera-Venkata & Evans 2001 all use it). This
 # conversion path exists so the head-to-head in experiments/colour_space/
-# can test whether Oklab -- the package default -- is actually the right
+# can test whether Oklab, the package default, is actually the right
 # choice for palette-structure-aware shaping, rather than asserting it.
 # (sRGB->XYZ matrix, D65 white point, and CIELAB constants live in
 # tramage._constants and are imported under these names at the top of the file.)
 
 
 def _lab_f(t: FloatArray) -> FloatArray:
-    """CIELAB nonlinear function on normalised XYZ ratios."""
+    """CIELAB nonlinear function on normalized XYZ ratios."""
     return np.where(t > _EPS_LAB, np.cbrt(t), _KAPPA_LAB * t + 4.0 / 29.0)
 
 
 def _lab_f_inv(t: FloatArray) -> FloatArray:
-    """Inverse of :func:`_lab_f`, mapping CIELAB back to normalised XYZ ratios."""
+    """Inverse of :func:`_lab_f`, mapping CIELAB back to normalized XYZ ratios."""
     t3 = t ** 3
     # Linear branch coefficient is 3*(6/29)^2 (NOT multiplied by eps; eps is
     # the forward threshold). See CIE 15:2004, or Bruce Lindbloom's reference.
@@ -162,8 +168,11 @@ def srgb_to_cielab(rgb: FloatArray) -> FloatArray:
 def cielab_to_srgb(lab: FloatArray) -> FloatArray:
     """Convert CIELAB (D65) back to gamma-encoded sRGB.
 
-    Values are not clipped to [0, 1]; out-of-gamut colours come back as
-    out-of-range floats, matching :func:`oklab_to_srgb`'s convention.
+    Same clipping convention as :func:`oklab_to_srgb`: negative
+    linear-light values are clipped to zero, while values above 1 pass
+    through, so out-of-gamut colors come back as out-of-range floats on
+    the high side. For out-of-gamut detection use :func:`in_gamut`
+    (Oklab input), which checks linear light before the transfer function.
     """
     fy = (lab[..., 0] + 16.0) / 116.0
     fx = lab[..., 1] / 500.0 + fy
@@ -189,8 +198,8 @@ def oklab_to_xyz(lab: FloatArray) -> FloatArray:
 
     Round-trips through linear sRGB using :func:`oklab_to_srgb` and
     :func:`srgb_to_linear`, then applies the standard sRGB-to-XYZ matrix.
-    Provided so that metrics and experiments that need XYZ — for example,
-    S-CIELAB — can reach it from the package's native Oklab without
+    Provided so that metrics and experiments that need XYZ (for example,
+    S-CIELAB) can reach it from the package's native Oklab without
     duplicating conversion constants.
     """
     return srgb_to_xyz(srgb_to_linear(oklab_to_srgb(lab)))

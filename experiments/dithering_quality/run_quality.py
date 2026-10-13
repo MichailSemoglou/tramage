@@ -1,4 +1,4 @@
-"""Dither the Kodak corpus with three variants and score each on fidelity/noise.
+"""Dither the Kodak24 + CQ100 corpora with three variants and score each on fidelity/noise.
 
 The geometry check in ``experiments/palette_geometry`` established that
 k-means palettes extracted from natural images are consistently and
@@ -10,8 +10,8 @@ Three variants are compared on every (image, K) trial:
 
 - ``baseline``: ``shaping=None`` (vector Floyd-Steinberg).
 - ``global``:   one shaping matrix from the whole palette's covariance.
-- ``cell``:     one shaping matrix per palette colour, from its k nearest
-                neighbours.
+- ``cell``:     one shaping matrix per palette color, from its k nearest
+                neighbors.
 
 Each dither is scored with ``tramage.metrics``. No new method code; this
 exercises the package's public API unchanged. Output is one row per
@@ -22,7 +22,8 @@ is computed, so an interruption loses at most the trial in flight. A
 5-trial timing probe runs first, so the full run's cost is known before
 the whole job commits.
 
-Run from the repository root, after ``palette_geometry/fetch_kodak.py``::
+Run from the repository root, after ``palette_geometry/fetch_kodak.py`` and
+``cq100_quality/fetch_cq100.py`` (the CQ100 half of the corpus)::
 
     python experiments/dithering_quality/run_quality.py
 """
@@ -117,7 +118,7 @@ def main() -> None:
     for corpus in corpora:
         all_images += images_in(corpus)
     if not all_images:
-        raise SystemExit("no .png/.jpg images found in any corpus")
+        raise SystemExit("no .png/.jpg/.ppm images found in any corpus")
 
     prov = provenance(all_images, HERE.parent.parent)
 

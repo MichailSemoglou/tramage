@@ -1,15 +1,21 @@
-"""Oklab-vs-CIELAB head-to-head: which space gives shaping more purchase?
+"""Oklab-vs-CIELAB head-to-head: which space gives shaping more purchase.
 
 The package defaults to Oklab for palette-structure-aware shaping, on the
 assertion that Oklab's superior perceptual uniformity makes its covariance
 geometry more meaningful. This script tests that assertion directly by
-running the same Kodak24 dithering pipeline in three configurations:
+running the same dithering pipeline in four configurations:
 
-- ``oklab``:   shape in Oklab, score in Oklab.
-- ``cielab``:  shape in CIELAB, score in CIELAB.
-- ``baseline``: no shaping, in Oklab (the vector Floyd-Steinberg reference).
+- ``oklab-baseline``:  no shaping, in Oklab (the vector Floyd-Steinberg
+  reference).
+- ``oklab``:           shape in Oklab, score in Oklab.
+- ``cielab-baseline``: no shaping, in CIELAB.
+- ``cielab``:          shape in CIELAB, score in CIELAB.
 
-The metrics are computed in the colour space the dithering was done in, so
+The corpus is the full 124-image set (Kodak24 + CQ100): the resume design
+appends, so the CSV of record (``results/headtohead.csv``, 2976 rows)
+defines the scope.
+
+The metrics are computed in the color space the dithering was done in, so
 absolute values are not cross-comparable (CIELAB L* is 0-100, Oklab L is
 ~0-1). S-CIELAB ΔE is the exception: it is computed on the rendered RGB for
 every configuration, so it is directly cross-comparable. The comparison that
@@ -23,7 +29,7 @@ Per-cell shaping is intentionally not tested here: the
 complexity, so only the global variant is compared across spaces.
 
 Crash-safe (append-per-trial, dedupe at end). Same pattern as the other
-two experiment harnesses.
+experiment harnesses.
 
 Run from the repository root::
 
@@ -59,7 +65,7 @@ SEED = 0
 # eps as a fixed fraction of a palette's largest eigenvalue, for cross-space
 # comparability. DEFAULT_EPS is tuned to Oklab's L~0-1 scale; the 0.05 divisor
 # is a typical Kodak Oklab eigenvalue, so this fraction reproduces DEFAULT_EPS's
-# behaviour in Oklab while staying unit-free for CIELAB (L* 0-100). See
+# behavior in Oklab while staying unit-free for CIELAB (L* 0-100). See
 # _space_relative_eps below.
 _EPS_FRACTION = DEFAULT_EPS / 0.05
 
@@ -113,7 +119,7 @@ def _space_relative_eps(palette: np.ndarray) -> float:
     is below the same *fraction* of the dominant axis, regardless of units.
 
     The fraction 0.0004/0.05 ~= 0.8% is calibrated so that on a typical
-    Kodak Oklab palette, this reproduces the package default's behaviour
+    Kodak Oklab palette, this reproduces the package default's behavior
     (the smallest eigenvalue gets a gain near 0.15, the largest near 0.99).
     """
     _, eigenvalues, _ = global_shaping_matrix(palette, eps=DEFAULT_EPS)
@@ -168,7 +174,9 @@ def _timing_probe(images: list[Path], n: int = 3) -> float:
         times.append(dt)
         print(f"  probe {i+1}: {configs[i]} K={K}  {dt:.2f}s", flush=True)
     mean = sum(times) / len(times)
-    print(f"mean per-trial: {mean:.2f}s  -> 432 trials est. {mean*432/60:.1f} min", flush=True)
+    n_trials = len(images) * len(KS) * len(CONFIGS)  # K values x configs
+    est_min = mean * n_trials / 60
+    print(f"mean per-trial: {mean:.2f}s  -> {n_trials} trials est. {est_min:.1f} min", flush=True)
     return mean
 
 
@@ -188,7 +196,7 @@ def main() -> None:
     for corpus in corpora:
         all_images += images_in(corpus)
     if not all_images:
-        raise SystemExit("no .png/.jpg images found in any corpus")
+        raise SystemExit("no .png/.jpg/.ppm images found in any corpus")
 
     prov = provenance(all_images, HERE.parent.parent)
 
@@ -223,7 +231,7 @@ def main() -> None:
                             "K": K, "config": config, "eps": eps_used,
                         }
                         row.update(score(dithered, original, scielab=False))
-                        # S-CIELAB on the rendered RGB, so both colour spaces
+                        # S-CIELAB on the rendered RGB, so both color spaces
                         # are compared in the same perceptual coordinates.
                         if config.startswith("oklab"):
                             dithered_rgb = oklab_to_srgb(dithered)

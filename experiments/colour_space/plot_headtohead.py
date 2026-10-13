@@ -1,6 +1,7 @@
 """Plot the Oklab-vs-CIELAB head-to-head results.
 
-Two figures:
+Two figures, both summarizing the full 124-image corpus (Kodak24 + CQ100;
+the CSV of record defines the scope):
 
 - ``relative_improvement_vs_K.png`` -- the headline plot. For each metric,
   two lines showing the relative shaping improvement vs K: one for Oklab
@@ -8,11 +9,11 @@ Two figures:
   (relative improvement = 0). Unit-free, so the two spaces are directly
   comparable here: whichever line sits higher is the space where shaping
   has more purchase.
-- ``raw_metrics_vs_K.png`` -- raw metric values per K, three lines
-  (baseline/oklab/cielab). Raw values are NOT cross-comparable between
-  spaces (CIELAB L* is 0-100, Oklab L is ~0-1), so the lines are for
-  transparency and shape comparison only, not for reading off "which is
-  lower". A note on the figure says so.
+- ``raw_metrics_vs_K.png`` -- raw metric values per K, four lines
+  (oklab-baseline/oklab/cielab-baseline/cielab). Raw values are NOT
+  cross-comparable between spaces (CIELAB L* is 0-100, Oklab L is ~0-1),
+  so the lines are for transparency and shape comparison only, not for
+  reading off "which is lower". A note on the figure says so.
 
 Run from the repository root, after run_headtohead.py::
 
@@ -101,7 +102,7 @@ def plot_relative_improvement(rows: list[dict]) -> None:
         ax.set_ylabel(f"relative improvement\n({label})")
         ax.grid(True, alpha=0.3)
     axes[0].legend(title="shaping space", fontsize=9, loc="upper right")
-    fig.suptitle("Which colour space gives palette-structure shaping more purchase?\n"
+    fig.suptitle("Which color space gives palette-structure shaping more purchase?\n"
                  "Relative improvement over each space's own baseline "
                  "(line = median, band = 25-75%)", fontsize=11)
     fig.tight_layout()

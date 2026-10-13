@@ -1,6 +1,6 @@
 """Corpus-scale epsilon sensitivity for the shaping matrix.
 
-`run_sweep.py` characterises eps on a single synthetic image. This script
+`run_sweep.py` characterizes eps on a single synthetic image. This script
 asks the corpus-scale question the paper needs: how much do the headline
 numbers move when eps leaves its default? For every (Kodak image, K) it
 dithers once unshaped and once per eps multiplier, scoring each dither with
@@ -85,7 +85,7 @@ def main() -> None:
     for corpus in corpora:
         all_images += images_in(corpus)
     if not all_images:
-        raise SystemExit("no .png/.jpg images found in any corpus")
+        raise SystemExit("no .png/.jpg/.ppm images found in any corpus")
 
     prov = provenance(all_images, HERE.parent.parent)
 

@@ -1,6 +1,16 @@
-"""Near-degenerate condition: palette b jittered slightly off the plane."""
+"""Near-degenerate condition: palette b jittered slightly off the plane.
+
+Historical record (see README.md); the original hardcoded output paths were
+sanitized to prototypes/out/. Run from the prototypes/ folder: the exec
+line below reads palette_aware_dither.py by relative path and splits its
+source on a 74-character marker line.
+"""
 import numpy as np
+from pathlib import Path
 exec(open("palette_aware_dither.py").read().split("# ---------------------------------------------------------------- palette")[0])
+
+OUT = Path(__file__).resolve().parent / "out"
+OUT.mkdir(exist_ok=True)
 
 B_PLANE = 0.02
 Ls = [0.40, 0.55, 0.70]
@@ -10,10 +20,11 @@ palette = np.array([[L, a, B_PLANE] for L in Ls for a in As])
 palette[:, 2] += jit
 assert all(in_gamut(p) for p in palette)
 N = len(palette)
-print(f"Palette: {N} colours, b spread std={palette[:,2].std():.4f} (near-degenerate)")
+print(f"Palette: {N} colors, b spread std={palette[:,2].std():.4f} (near-degenerate)")
 
 EPS = 0.02 ** 2
 def shaping_matrix(points, centre=None):
+    """Covariance-eigenstructure shaping matrix with gains lam/(lam+EPS)."""
     d = points - (points.mean(axis=0) if centre is None else centre)
     cov = d.T @ d / len(d)
     lam, V = np.linalg.eigh(cov)
@@ -41,6 +52,7 @@ img = srgb_to_oklab(np.clip(oklab_to_srgb(img), 0, 1))
 
 FS = [(0,1,7/16),(1,-1,3/16),(1,0,5/16),(1,1,1/16)]
 def dither(image, mode):
+    """mode: 'baseline' | 'global' | 'cell'"""
     buf = image.copy()
     out = np.zeros((H, W), dtype=np.int64)
     for y in range(H):
@@ -100,9 +112,9 @@ panels = [("original (continuous)", img),
 for ax,(t,lab) in zip(axes[0],panels):
     ax.imshow(to_rgb(lab)); ax.set_title(t,fontsize=11); ax.axis("off")
 for ax,(t,lab) in zip(axes[1],panels):
-    ax.imshow(to_rgb(lab[crop])); ax.set_title(t+" (centre crop)",fontsize=10); ax.axis("off")
-fig.suptitle("Near-degenerate palette (b spread std 0.005) with smooth off-plane b demand", fontsize=12)
-fig.tight_layout(); fig.savefig("/home/claude/comparison_near.png", dpi=130)
+    ax.imshow(to_rgb(lab[crop])); ax.set_title(t+" (center crop)",fontsize=10); ax.axis("off")
+fig.suptitle("Near-degenerate palette (b spread std 0.0057) with smooth off-plane b demand", fontsize=12)
+fig.tight_layout(); fig.savefig(OUT / "comparison_near.png", dpi=130)
 
 fig2, axes2 = plt.subplots(1,3, figsize=(13,4.4))
 for ax,m in zip(axes2, names):
@@ -110,5 +122,5 @@ for ax,m in zip(axes2, names):
     P = np.log10(np.abs(np.fft.fftshift(np.fft.fft2(e-e.mean())))**2 + 1e-12)
     ax.imshow(P, cmap="magma"); ax.set_title(f"{m}: log power, L error", fontsize=10); ax.axis("off")
 fig2.suptitle("Error power spectra (L channel), near-degenerate palette", fontsize=11)
-fig2.tight_layout(); fig2.savefig("/home/claude/spectra_near.png", dpi=130)
+fig2.tight_layout(); fig2.savefig(OUT / "spectra_near.png", dpi=130)
 print("figures written")

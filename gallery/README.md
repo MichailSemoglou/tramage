@@ -18,8 +18,14 @@ _The same layout, but the palette here is exactly confined to a single plane in 
 
 _Log power spectra of the lightness-channel error, near-degenerate palette. Diffusion that cannot shed unpayable error tends to leave more energy at low spatial frequency, visible here as extra concentration near the centre of the spectrum for the baseline compared with the shaped variants. This is the spectral signature behind the noise-standard-deviation numbers above; it is a subtle effect at this scale, which is itself worth stating plainly rather than overselling._
 
+![Error power spectra for the exactly rank-deficient palette: all three panels are identical](images/spectra-rank-deficient.png)
+
+_The same spectra for the exactly rank-deficient palette. All three panels are identical: with the palette confined to a single plane, shaping has nothing to change, and every variant leaves the same error behind. This is the spectral counterpart of the null result above._
+
 ## Regenerating these images
 
-All three images are produced by `python gallery/generate_gallery.py`, using only `tramage`’s public API on synthetic, exactly reproducible test cases (no external photograph is required). Running it again from a fresh checkout reproduces these files exactly.
+All four images are produced by `python gallery/generate_gallery.py`, using only the installed `tramage` package (no prototype code) on synthetic, exactly reproducible test cases (no external photograph is required). Running it again from a fresh checkout reproduces these files exactly.
+
+The interactive demo `epsilon_dial.py` (`python gallery/epsilon_dial.py`, needs an interactive matplotlib backend) is not part of the regenerated set: it opens a live epsilon slider over the dithered output, error map, and shaping gains.
 
 A note on the per-cell panel: it is shown here for completeness alongside the global variant, because the gallery is the historical record of the method's development. A 124-image corpus run (see [`../experiments/dithering_quality/`](../experiments/dithering_quality/README.md)) has since found that the per-cell variant holds up on noise but loses on tone accuracy and the worm metric from K=16 onward, so the **recommended method is the global variant alone**; `per_cell_shaping_matrices` is kept in the package as an explored extension, not as an endorsed second choice.

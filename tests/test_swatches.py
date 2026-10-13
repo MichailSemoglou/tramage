@@ -16,6 +16,8 @@ def test_load_hex_list_hash_prefixed(tmp_path):
     assert palette.shape == (3, 3)
     assert names == ["#FF5733", "#33FF57", "#3357FF"]
     rgb = np.clip(oklab_to_srgb(palette), 0, 1)
+    # Loose tolerance: the color has been through a hex decode and a
+    # cross-space round trip (sRGB -> Oklab -> sRGB).
     assert np.allclose(rgb[0], [0xFF / 255, 0x57 / 255, 0x33 / 255], atol=1e-3)
 
 
@@ -81,12 +83,17 @@ def test_load_gpl_rejects_non_gpl_file(tmp_path):
 
 
 def test_load_gpl_clips_out_of_range_values(tmp_path):
-    """A malformed or hand-edited file with an out-of-range value should be
-    clipped rather than silently producing a colour outside the sRGB gamut."""
+    """An out-of-range value in a hand-edited file should be clipped into gamut.
+
+    The loader must clip the channel rather than silently produce a color
+    outside the sRGB gamut.
+    """
     path = tmp_path / "palette.gpl"
     path.write_text("GIMP Palette\n300 0 0\tOut of range\n")
     palette, _ = load_gpl(path)
     rgb = np.clip(oklab_to_srgb(palette), 0, 1)
+    # Loose tolerance: the color has been through a 0-255 decode and a
+    # cross-space round trip (sRGB -> Oklab -> sRGB).
     assert np.allclose(rgb[0], [1.0, 0.0, 0.0], atol=1e-3)
 
 
@@ -95,7 +102,7 @@ def _pack_ase_entry(name: str, model: bytes, values: tuple) -> bytes:
     name_len = len(name_utf16) // 2
     data = struct.pack(">H", name_len) + name_utf16 + model
     data += struct.pack(f">{len(values)}f", *values)
-    data += struct.pack(">H", 0)  # colour type: Global
+    data += struct.pack(">H", 0)  # color type: Global
     return struct.pack(">HI", 0x0001, len(data)) + data
 
 
@@ -118,6 +125,8 @@ def test_load_ase_rgb_and_cmyk_and_gray(tmp_path):
     assert names == ["Red", "Half Gray", "Black CMYK"]
 
     rgb = np.clip(oklab_to_srgb(palette), 0, 1)
+    # Loose tolerance: ASE stores float32 and the colors have been through
+    # a cross-space round trip (sRGB -> Oklab -> sRGB).
     assert np.allclose(rgb[0], [1.0, 0.0, 0.0], atol=1e-3)
     assert np.allclose(rgb[1], [0.5, 0.5, 0.5], atol=1e-3)
     assert np.allclose(rgb[2], [0.0, 0.0, 0.0], atol=1e-3)
@@ -147,8 +156,8 @@ def test_load_ase_rejects_bad_signature(tmp_path):
 def test_load_ase_rejects_truncated_file(tmp_path):
     """Header claims 2 blocks but the file only contains 1.
 
-    Previously this leaked a raw, cryptic `struct.error` instead of the
-    module's own clear `ValueError`.
+    load_ase must raise the module's own ValueError rather than a raw
+    struct.error.
     """
     entry = _pack_ase_entry("Red", b"RGB ", (1.0, 0.0, 0.0))
     header = b"ASEF" + struct.pack(">HHI", 1, 0, 2)
@@ -161,9 +170,7 @@ def test_load_ase_rejects_truncated_file(tmp_path):
 def test_load_ase_rejects_oversized_block_length(tmp_path):
     """A block declares a length longer than the bytes that actually follow.
 
-    Previously this was silently accepted: slicing truncated the block
-    without error, and the truncated bytes were misparsed as a garbled
-    fake swatch instead of raising.
+    load_ase must raise rather than silently misparse the truncated bytes.
     """
     bad_entry = struct.pack(">HI", 0x0001, 9999) + b"short data"
     header = b"ASEF" + struct.pack(">HHI", 1, 0, 1)

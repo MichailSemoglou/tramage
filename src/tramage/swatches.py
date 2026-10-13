@@ -10,12 +10,12 @@ and :mod:`tramage.diffusion` without going through an image at all.
 Scope is deliberately narrow rather than attempting universal swatch
 support. Adobe Swatch Exchange is a semi-documented binary format that has
 drifted slightly between Adobe application versions; this parser reads
-RGB, Gray and CMYK colour entries, which are the overwhelming majority
+RGB, Gray and CMYK color entries, which are the overwhelming majority
 found in real files, and skips LAB entries with a warning rather than
-silently misconverting them, since this package has no CIE Lab pipeline to
-convert them correctly. CMYK entries are converted to sRGB with a naive,
-uncalibrated formula and should be treated as an approximation, not a
-colour-managed conversion.
+silently misconverting them: ASE's Lab encoding would need a dedicated
+conversion path that is not implemented here. CMYK entries are converted
+to sRGB with a naive, uncalibrated formula and should be treated as an
+approximation, not a color-managed conversion.
 """
 
 from __future__ import annotations
@@ -49,15 +49,21 @@ def _srgb_to_hex_name(r: float, g: float, b: float) -> str:
 
 
 def load_hex_list(path: str | Path) -> tuple[FloatArray, list[str]]:
-    """Load a plain text file of hex colour codes, returning (palette, names).
+    """Load a plain text file of hex color codes, returning (palette, names).
 
     Accepts one code per line, several separated by commas or whitespace on
     one line, with or without a leading ``#``, and 3- or 6-digit forms.
-    Anything that is not a recognisable hex token (headers, comments,
+    Anything that is not a recognizable hex token (headers, comments,
     surrounding text from a Coolors.co-style export) is ignored rather than
     treated as an error. If no ``#``-prefixed tokens are found at all, each
     line is tried as a bare hex code on its own. Names are the hex code
-    itself, since plain hex lists rarely carry a separate colour name.
+    itself, since plain hex lists rarely carry a separate color name.
+
+    Raises
+    ------
+    ValueError
+        If the file contains no recognizable hex color codes.
+
     """
     text = Path(path).read_text()
     tokens = list(_HEX_WITH_HASH_RE.findall(text))
@@ -67,7 +73,7 @@ def load_hex_list(path: str | Path) -> tuple[FloatArray, list[str]]:
             if _BARE_HEX_RE.match(stripped):
                 tokens.append(stripped)
     if not tokens:
-        raise ValueError(f"no hex colour codes found in {path!s}")
+        raise ValueError(f"no hex color codes found in {path!s}")
 
     srgb = np.array([_hex_to_srgb(t) for t in tokens], dtype=np.float64)
     names = [
@@ -82,8 +88,15 @@ def load_gpl(path: str | Path) -> tuple[FloatArray, list[str]]:
 
     Follows the standard GPL text format: a ``GIMP Palette`` header line,
     optional ``Name:`` and ``Columns:`` lines, ``#``-prefixed comment
-    lines, and one colour per remaining line as three whitespace-separated
+    lines, and one color per remaining line as three whitespace-separated
     0-255 integers, optionally followed by a name for the rest of the line.
+
+    Raises
+    ------
+    ValueError
+        If the file does not start with a ``GIMP Palette`` header, or
+        contains no color entries.
+
     """
     lines = Path(path).read_text().splitlines()
     if not lines or not lines[0].strip().upper().startswith("GIMP PALETTE"):
@@ -110,7 +123,7 @@ def load_gpl(path: str | Path) -> tuple[FloatArray, list[str]]:
         )
 
     if not srgb:
-        raise ValueError(f"no colour entries found in {path!s}")
+        raise ValueError(f"no color entries found in {path!s}")
     # Well-formed GPL files always have 0-255 integers, but clip defensively
     # in case of a malformed or hand-edited file with an out-of-range value.
     clipped = np.clip(np.array(srgb, dtype=np.float64), 0.0, 1.0)
@@ -120,11 +133,19 @@ def load_gpl(path: str | Path) -> tuple[FloatArray, list[str]]:
 def load_ase(path: str | Path) -> tuple[FloatArray, list[str]]:
     """Load an Adobe Swatch Exchange (``.ase``) file, returning (palette, names).
 
-    Reads RGB, Gray and CMYK colour entries; group start and end markers
+    Reads RGB, Gray and CMYK color entries; group start and end markers
     are read and discarded, so the palette is returned flat, without group
-    structure. LAB entries are skipped with a warning, since this package
-    has no CIE Lab conversion; CMYK entries are converted with a naive,
-    uncalibrated formula and should be treated as approximate.
+    structure. LAB entries are skipped with a warning, because ASE's Lab
+    encoding would need a dedicated conversion path that is not implemented
+    here; CMYK entries are converted with a naive, uncalibrated formula
+    and should be treated as approximate.
+
+    Raises
+    ------
+    ValueError
+        If the file is not an ASE file (bad signature), is truncated or
+        corrupt, or contains no usable color entries.
+
     """
     data = Path(path).read_bytes()
     if data[:4] != b"ASEF":
@@ -176,24 +197,25 @@ def load_ase(path: str | Path) -> tuple[FloatArray, list[str]]:
             elif model == "LAB ":
                 warnings.warn(
                     f"skipping LAB swatch {name!r} in {path!s}: "
-                    "tramage has no CIE Lab conversion",
+                    "ASE's Lab encoding requires a dedicated conversion path "
+                    "that tramage does not implement",
                     stacklevel=2,
                 )
                 continue
             else:
                 warnings.warn(
-                    f"skipping swatch {name!r} with unrecognised colour model {model!r}",
+                    f"skipping swatch {name!r} with unrecognized color model {model!r}",
                     stacklevel=2,
                 )
                 continue
         except struct.error as exc:
-            raise ValueError(f"corrupt ASE colour entry in {path!s}") from exc
+            raise ValueError(f"corrupt ASE color entry in {path!s}") from exc
 
         srgb.append((r, g, b))
         names.append(name or _srgb_to_hex_name(r, g, b))
 
     if not srgb:
-        raise ValueError(f"no usable colour entries found in {path!s}")
+        raise ValueError(f"no usable color entries found in {path!s}")
     clipped = np.clip(np.array(srgb, dtype=np.float64), 0.0, 1.0)
     return srgb_to_oklab(clipped), names
 
@@ -202,8 +224,14 @@ def load_swatch(path: str | Path) -> tuple[FloatArray, list[str]]:
     """Load a palette from a swatch file, dispatching on its file extension.
 
     Supports Adobe Swatch Exchange (``.ase``) and GIMP palette (``.gpl``)
-    files by extension; anything else is tried as a plain text hex colour
+    files by extension; anything else is tried as a plain text hex color
     list.
+
+    Raises
+    ------
+    ValueError
+        Propagated from the delegated loader when the file is malformed.
+
     """
     path = Path(path)
     suffix = path.suffix.lower()

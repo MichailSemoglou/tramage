@@ -1,6 +1,7 @@
 """Plot the Oklab geometry of extracted palettes from the results CSV.
 
-Two figures, each designed to answer the reframing question directly:
+Two figures, each designed to answer directly whether extracted palettes
+are consistently near-degenerate in Oklab:
 
 - ``by_K.png`` -- stacked bars showing the distribution of palette
   degeneracy classes per K value. The ">=1 flat axis" share is the single
@@ -102,17 +103,18 @@ def plot_degeneracy_by_K(rows: list[dict]) -> None:
 def plot_eigenvalue_ratio(rows: list[dict]) -> None:
     """Strip plot of the continuous degeneracy score (lambda1+lambda2)/lambda3 vs K.
 
-    A perfectly isotropic palette has ratio 2 (three equal eigenvalues).
-    A perfectly planar palette has lambda3 = 0, hence ratio = infinity; we
-    clip to a sensible ceiling. Lower ratios mean more isotropic; higher
-    mean more degenerate.
+    The CSV stores np.linalg.eigh eigenvalues ascending, so lambda3 is the
+    largest. A perfectly isotropic palette has three equal eigenvalues and
+    ratio 2, the maximum; the score falls as the palette degenerates
+    (toward 1 for a planar palette, toward 0 for a linear one). Smaller
+    ratios therefore mean more degenerate palettes.
     """
     Ks = sorted({row["K"] for row in rows})
     by_K: dict[float, list[float]] = defaultdict(list)
     for row in rows:
-        lam3 = max(row["lambda3"], 1e-12)
+        lam3 = max(row["lambda3"], 1e-12)  # zero only for a single-color palette
         ratio = (row["lambda1"] + row["lambda2"]) / lam3
-        by_K[row["K"]].append(min(ratio, 50.0))  # ceiling; genuine planar pile up here
+        by_K[row["K"]].append(min(ratio, 50.0))  # defensive clip; never triggers (score <= 2)
 
     fig, ax = plt.subplots(figsize=(8.5, 5.0))
     rng = np.random.default_rng(0)

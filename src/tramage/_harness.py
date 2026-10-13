@@ -35,7 +35,7 @@ from .metrics import (
 # used both to skip already-computed trials and to dedupe the final CSV.
 Key = Callable[[dict], Hashable]
 
-# Image suffixes recognised across the corpora (Kodak is PNG; CQ100 may add PPM).
+# Image suffixes recognized across the corpora (Kodak is PNG; CQ100 may add PPM).
 IMAGE_SUFFIXES = (".png", ".jpg", ".ppm")
 
 
@@ -68,9 +68,9 @@ def score(dithered: np.ndarray, original: np.ndarray, *, scielab: bool = True) -
     """Compute the metric fields shared by every dithering-quality CSV row.
 
     The bias/noise/tone/low-frequency/anisotropy metrics are space-agnostic
-    (they operate on whatever colour space the caller passes in). S-CIELAB
+    (they operate on whatever color space the caller passes in). S-CIELAB
     ΔE additionally requires Oklab input, so callers that score in a
-    different working space (the CIELAB arm of the colour-space comparison)
+    different working space (the CIELAB arm of the color-space comparison)
     pass ``scielab=False`` and compute it on the rendered RGB themselves.
     """
     bias = systematic_bias(dithered, original)

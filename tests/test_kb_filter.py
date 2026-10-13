@@ -15,9 +15,11 @@ def test_kb_filters_shape_and_finite():
 
 
 def test_kb_filters_not_all_equal_to_floyd_steinberg():
-    """The published KB values differ from Floyd-Steinberg's 7/3/5/1 over 16
-    -- if they were identical, the KB baseline would silently reduce to FS
-    and the experiment would be meaningless."""
+    """The published KB values differ from Floyd-Steinberg's 7/3/5/1 over 16.
+
+    If they were identical, the KB baseline would silently reduce to FS and the
+    experiment would be meaningless.
+    """
     f = kb_filters()
     fs = np.array([7 / 16, 3 / 16, 5 / 16, 1 / 16])
     # At least the luminance (Y) channel should differ from FS.
@@ -34,8 +36,11 @@ def test_kb_diffuse_output_shape_matches_input():
 
 
 def test_kb_diffuse_differs_from_plain_floyd_steinberg():
-    """The KB filter taps are different from FS, so the output of kb_diffuse
-    with the published filters must differ from diffuse with FS weights."""
+    """The KB filter taps are different from FS.
+
+    So the output of kb_diffuse with the published filters must differ from
+    diffuse with FS weights.
+    """
     rng = np.random.default_rng(1)
     image = srgb_to_oklab(rng.uniform(size=(48, 48, 3)))
     palette = srgb_to_oklab(rng.uniform(size=(6, 3)))
@@ -45,10 +50,12 @@ def test_kb_diffuse_differs_from_plain_floyd_steinberg():
 
 
 def test_kb_diffuse_constant_image_gives_constant_output():
-    """Dithering an image that is a single colour, against a palette that
-    contains that colour, should reproduce that colour at every pixel --
-    basic correctness check that the diffusion loop is unbiased for a flat
-    input."""
+    """A flat image made entirely of one palette color should dither losslessly.
+
+    The input is exactly a palette color, so every pixel quantizes with zero
+    error and no error ever enters the loop; this pins lossless reproduction,
+    and no biased kernel could be caught by it.
+    """
     colour = np.array([0.5, 0.0, 0.0])
     image = np.tile(colour, (16, 16, 1))
     palette = np.array([colour, colour + np.array([0.1, 0.0, 0.0])])
@@ -57,8 +64,11 @@ def test_kb_diffuse_constant_image_gives_constant_output():
 
 
 def test_kb_diffuse_with_shaping_differs_from_without():
-    """The shaping matrix should change the output of kb_diffuse, confirming
-    the shaping path is wired through the opponent-space diffusion loop."""
+    """The shaping matrix should change the output of kb_diffuse.
+
+    This confirms the shaping path is wired through the opponent-space
+    diffusion loop.
+    """
     rng = np.random.default_rng(2)
     image = srgb_to_oklab(rng.uniform(size=(40, 40, 3)))
     palette = srgb_to_oklab(rng.uniform(size=(5, 3)))
@@ -71,10 +81,12 @@ def test_kb_diffuse_with_shaping_differs_from_without():
 
 
 def test_kb_filters_match_published_table1():
-    """Pin the exact kolpatzik1992 Table 1 ("1st order LP") coefficients, in
-    the FS support order ((0,1), (1,-1), (1,0), (1,1)). The KB baseline is
-    only meaningful if these are the paper's values; a silent edit must fail
-    loudly."""
+    """Pin the exact Kolpatzik & Bouman (1992) Table 1 ("1st order LP") coefficients.
+
+    Weights are listed in the FS support order ((0,1), (1,-1), (1,0), (1,1)).
+    The KB baseline is only meaningful if these are the paper's values; a
+    silent edit must fail loudly.
+    """
     expected = np.array([
         [0.7770, -0.009, 0.7861, -0.6098],   # luminance (Y)
         [0.8767, 0.0359, 0.8205, -0.7376],   # chrominance (rg)

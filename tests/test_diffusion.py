@@ -1,4 +1,7 @@
-"""Tests for serpentine error diffusion: weight energy and basic behaviour."""
+"""Tests for serpentine error diffusion.
+
+Kernel energy, palette membership, and interaction with shaping matrices.
+"""
 
 import numpy as np
 
@@ -28,7 +31,7 @@ def test_diffuse_output_uses_only_palette_colours():
 
 
 def test_diffuse_exact_palette_colour_reproduces_it_perfectly():
-    """A flat image made entirely of one palette colour should dither losslessly."""
+    """A flat image made entirely of one palette color should dither losslessly."""
     palette = np.array([[0.4, 0.0, 0.0], [0.6, 0.1, -0.1]])
     image = np.tile(palette[0], (10, 10, 1))
     dithered, indices = diffuse(image, palette)
@@ -47,9 +50,9 @@ def test_shaping_none_equals_identity_shaping():
 
 
 def test_shaping_is_inert_at_the_diffusion_level_for_a_degenerate_palette():
-    """Shaping cannot change quantisation decisions on an exactly rank-deficient palette.
+    """Shaping cannot change quantization decisions on an exactly rank-deficient palette.
 
-    Every palette colour here shares the same b, so b-error contributes an
+    Every palette color here shares the same b, so b-error contributes an
     identical constant to every candidate's squared distance and can never
     change which one is nearest. Baseline and shaped diffusion must
     therefore choose exactly the same palette index at every pixel, even
@@ -75,7 +78,7 @@ def test_shaping_is_inert_at_the_diffusion_level_for_a_degenerate_palette():
 
 
 def test_diffuse_with_per_cell_shaping():
-    """Per-cell shaping matrices should produce valid palette-colour output."""
+    """Per-cell shaping matrices should produce valid palette-color output."""
     rng = np.random.default_rng(15)
     image = rng.uniform(size=(16, 16, 3))
     palette = rng.uniform(size=(6, 3))

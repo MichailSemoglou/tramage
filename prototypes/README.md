@@ -2,8 +2,10 @@
 
 This folder holds the three research scripts in which the algorithm in this
 package was first worked out and tested. They are kept verbatim, as the
-historical record of the work, rather than tidied into the package’s style.
-The package under `src/tramage/` is the maintained, tested successor; treat
+historical record of the work, rather than tidied into the package’s style,
+with one exception: the hardcoded paths from the machine they were written
+on were sanitized to repo-relative paths (see "Running them" below). The
+package under `src/tramage/` is the maintained, tested successor; treat
 these as notebooks, not as an interface.
 
 ## Files
@@ -29,10 +31,10 @@ Each script depends on the one before it: `near_degenerate.py` and
 `photo_pipeline.py` both read `palette_aware_dither.py` from disk with
 `exec(open(...).read()...)` to reuse its Oklab conversion functions, rather
 than importing them, which is why they must be run from inside this folder.
-They also write figures to and, for `photo_pipeline.py`, read a photograph
-from, paths on the machine they were first written on (`/home/claude/...`
-and `/mnt/user-data/uploads/...`), which will not resolve elsewhere. Update
-those paths if you want to rerun them; the logic itself needs no changes.
+Figures are written to `out/` inside this folder (created on demand), and
+`photo_pipeline.py` takes the input photograph as a command-line argument:
+
+    python prototypes/photo_pipeline.py path/to/photo.jpg
 
 They require `numpy`, `scipy`, `matplotlib`, and, for `photo_pipeline.py`,
 `pillow`.

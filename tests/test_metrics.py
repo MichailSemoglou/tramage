@@ -46,8 +46,11 @@ def test_lowfreq_energy_fraction_is_between_zero_and_one():
 
 
 def test_lowfreq_energy_fraction_higher_for_low_frequency_drift():
-    """Slow drift should register a higher low-frequency fraction than
-    high-frequency noise of comparable magnitude."""
+    """Slow drift should score a higher low-frequency fraction than high-frequency noise.
+
+    The drift is a 0.05-amplitude sinusoid and the noise is independent
+    +/-0.05 per pixel: equal magnitude, so only the frequency content differs.
+    """
     height = width = 64
     rng = np.random.default_rng(12)
     original = np.zeros((height, width, 3))
@@ -129,9 +132,11 @@ def test_scielab_de_full_returns_dict():
 
 
 def test_scielab_de_reduced_sensitivity_to_high_frequency():
-    """S-CIELAB spatial filtering should make ΔE lower for high-frequency
-    noise of the same pixel-level magnitude as low-frequency drift, because
-    the contrast sensitivity function attenuates high frequencies."""
+    """S-CIELAB should make ΔE lower for high-frequency noise than for low-frequency drift.
+
+    The noise and the drift have the same pixel-level magnitude; the
+    contrast sensitivity function attenuates the high frequencies.
+    """
     rng = np.random.default_rng(34)
     from tramage import srgb_to_oklab
     height, width = 64, 64
@@ -154,9 +159,11 @@ def test_scielab_de_reduced_sensitivity_to_high_frequency():
 
 
 def test_scielab_de_dpi_scaling():
-    """Higher DPI (more pixels per visual degree) should narrow the spatial
-    filters in visual angle terms, making the same pixel-level noise appear
-    more visible (higher ΔE) because it occupies a larger visual angle."""
+    """Higher DPI packs more pixels into a degree of visual angle.
+
+    So the same pixel-level noise sits at higher spatial frequencies and is
+    attenuated more by the CSF-shaped filters; ΔE should decrease.
+    """
     rng = np.random.default_rng(35)
     from tramage import srgb_to_oklab
     rgb = rng.uniform(0, 1, size=(48, 48, 3))
@@ -165,15 +172,16 @@ def test_scielab_de_dpi_scaling():
 
     de_low_dpi = scielab_de(noisy, img, dpi=50, viewing_distance_cm=40)
     de_high_dpi = scielab_de(noisy, img, dpi=200, viewing_distance_cm=40)
-    # At 200 DPI the same pixel grid subtends a smaller visual angle,
-    # so the noise is finer and perceptually less visible.
+    # Expected direction justified in the docstring.
     assert de_high_dpi < de_low_dpi
 
 
 def test_scielab_de_flat_fields_match_cie76_both_filter_paths():
-    """Flat colour pairs must return exactly CIE76: the filters are
-    DC-preserving, so spatial filtering is identity on flat fields, in both
-    the tabulated-kernel and Gaussian-approximation paths."""
+    """Flat color pairs must return exactly CIE76.
+
+    The filters are DC-preserving, so spatial filtering is identity on flat
+    fields, in both the tabulated-kernel and Gaussian-approximation paths.
+    """
     from tramage import srgb_to_cielab, srgb_to_oklab
     rgb0 = np.full((32, 40, 3), (0.8, 0.3, 0.5))
     rgb1 = np.full((32, 40, 3), (0.2, 0.6, 0.4))
@@ -186,9 +194,11 @@ def test_scielab_de_flat_fields_match_cie76_both_filter_paths():
 
 
 def test_scielab_kernels_unit_dc_and_luminance_surround():
-    """The tabulated kernels are DC-preserving; only the luminance kernel
-    has a negative bandpass surround — the published signature of the
-    Zhang & Wandell (1997) filters."""
+    """The tabulated kernels are DC-preserving.
+
+    Only the luminance kernel has a negative bandpass surround: the
+    published signature of the Zhang & Wandell (1997) filters.
+    """
     from tramage.metrics import _scielab_kernels
     lum, rg, by = _scielab_kernels(100.0, 40.0)
     for kernel in (lum, rg, by):
@@ -200,9 +210,12 @@ def test_scielab_kernels_unit_dc_and_luminance_surround():
 
 
 def test_scielab_zhang1997_matches_per_lobe_reference():
-    """The FFT kernel path must agree with applying each published Gaussian
-    lobe directly (unit-DC gaussian_filter per lobe, weighted sum) on the
-    opponent image — an independent construction of the same filters."""
+    """The FFT kernel path must agree with applying each published Gaussian lobe directly.
+
+    The reference applies a unit-DC gaussian_filter per lobe on the opponent
+    image and takes the weighted sum: an independent construction of the
+    same filters.
+    """
     from scipy.ndimage import gaussian_filter
 
     from tramage import srgb_to_oklab
@@ -237,7 +250,7 @@ def test_scielab_zhang1997_matches_per_lobe_reference():
     # Agreement is to ~1e-6, not machine epsilon: the two paths truncate the
     # wide luminance lobe (sigma ~119 px on this 48 px image) differently at
     # the borders. A real plumbing error (axis swap, dropped lobe, bad
-    # normalisation) would show up at O(0.01-1), orders above this bound.
+    # normalization) would show up at O(0.01-1), orders above this bound.
     assert np.allclose(got, reference, atol=1e-5)
 
 
