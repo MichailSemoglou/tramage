@@ -110,20 +110,28 @@ The canonical 124-image CSV is
 Re-run `run_cq100.py` only if the per-category breakdown is needed; otherwise
 treat this file as superseded.
 
-## Damera-Venkata baseline (done, scalar KB scope)
+## Damera-Venkata baseline (done, full matrix filter)
 
 `kb_baseline/` tests whether palette-structure-aware shaping still helps
 when the baseline diffusion filter is HVS-optimised rather than plain
-Floyd-Steinberg. Uses the scalar Kolpatzik-Bouman filter
-(kolpatzik1992 Table 1) — the separable special case of Damera-Venkata
-and Evans' matrix-valued filter — as the stronger baseline, with four
-configurations (FS baseline, FS+shaped, KB baseline, KB+shaped). See
+Floyd-Steinberg. It runs three filters, each with and without shaping
+(six configurations, 4464 trials): naive Floyd-Steinberg, the scalar
+Kolpatzik-Bouman filter (kolpatzik1992 Table 1, the separable special
+case of Damera-Venkata and Evans' matrix-valued filter), and the full
+matrix-valued DV filter in its closed-form Oklab redesign
+(`RUN_DV = True`). See
 [`kb_baseline/README.md`](kb_baseline/README.md) for the verdict. In
 short: shaping reduces noise by a median 22–33% on top of the KB filter,
-winning on 124/124 images at every K — the generalisation claim holds, at
-reduced magnitude relative to the FS comparison. The full matrix-valued DV filter
-remains as a possible follow-up if a reviewer demands the exact
-comparison; the scalar KB result is indicative. The interaction statistics
+winning on 124/124 images at every K, so the generalisation claim holds
+at reduced magnitude relative to the FS comparison. The DV analysis
+(`kb_baseline/analyze_dv.py`, S-CIELAB with Wilcoxon signed-rank tests)
+adds three findings. The full matrix filter is the strongest unshaped
+baseline, 3.6–21.7% below fs-baseline and 16.9–24.2% below kb-baseline
+at every K. The shaping × filter overlap is nearly complete for it:
+shaping adds 1–2% pooled, significant only on CQ100, and is harmful on
+Kodak from K=16. And shaped Floyd-Steinberg matches or beats the DV
+baseline at K ≤ 64, so palette-geometry shaping delivers prior-art-level
+quality at one 3×3 matrix multiply per pixel. The interaction statistics
 (`kb_baseline/analyze_interaction.py`) and the exploratory two-regime
 robustness check (`kb_baseline/analyze_regimes.py`) were regenerated on
 30 Aug 2026 with the corrected S-CIELAB kernels; see the kb_baseline

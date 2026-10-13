@@ -1,12 +1,38 @@
 """Matrix-valued error-diffusion filter design per Damera-Venkata & Evans (2001).
 
-Damera-Venkata and Evans generalise the scalar Kolpatzik-Bouman error
+Damera-Venkata and Evans generalize the scalar Kolpatzik-Bouman error
 filters to full matrix-valued taps: each Floyd-Steinberg tap is a 3×3
 matrix rather than a scalar, allowing cross-channel coupling that a
 channel-separable filter cannot express. The filter is designed to
-minimise perceived error variance under the Poirson-Wandell
-pattern-colour separable human vision model, by solving the matrix
+minimize perceived error variance under the Poirson-Wandell
+pattern-color separable human vision model, by solving the matrix
 Yule-Walker equations.
+
+Two properties of this implementation are worth stating, because they
+differ from a naive reading of the paper:
+
+1. The design is **direct, not trained**. Under DV&E's white-noise model
+   of the quantizer residual (their eqs. 64-65), the generalized
+   Yule-Walker system (their eq. 63) involves only the autocorrelation
+   of the HVS filter's matrix impulse response, and no training images.
+
+2. The diffusion runs **in Oklab**, the metric space. The opponent
+   transform enters only through the design, via G, the Jacobian of the
+   Oklab→(Poirson-Wandell opponent) map at the palette centroid, so the
+   matrix impulse response W[n] = diag(k_c[n]) @ G maps Oklab error
+   vectors to perceived opponent space. Because G is a fixed linear map,
+   running the diffusion in Oklab is what makes the taps' DC conservation
+   (sum h_j = I) protect the metric space's mean: diffusing in a working
+   space that is a *nonlinear* function of Oklab would conserve that
+   space's mean instead, leaking image-correlated low-frequency error.
+
+The DC constraint (sum of taps = I, DV&E's "lossless diffusion"
+constraint, their eq. 43) is imposed exactly, via Lagrange multipliers,
+rather than by projection. The designed filters are aggressive (they
+whiten the perceived noise), which puts the real quantizer loop at the
+edge of overload; ``dv_diffuse`` therefore clamps the accumulation
+buffer to a small margin around the palette's bounding box, the
+standard practical stabilizer for error diffusion with strong filters.
 
 Reference:
   N. Damera-Venkata and B. L. Evans, "Design and analysis of vector color
@@ -19,21 +45,37 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
 
-from ._constants import (
-    OPP_TO_XYZ,
-    SIGMA_CHROM_DEG,
-    SIGMA_LUM_DEG,
-    XYZ_TO_LINEAR_SRGB,
-    XYZ_TO_OPP,
-    pixels_per_degree,
-)
+from ._constants import OPP_TO_XYZ, XYZ_TO_LINEAR_SRGB, XYZ_TO_OPP
 from .colour import FloatArray, linear_to_srgb, oklab_to_xyz, srgb_to_oklab
 from .diffusion import _scanlines, nearest_palette_index
+from .metrics import _scielab_kernels
 
 _FS_POSITIONS: tuple[tuple[int, int], ...] = ((0, 1), (1, -1), (1, 0), (1, 1))
 _N_TAPS: int = len(_FS_POSITIONS)
+
+# Lags at which the HVS impulse-response autocorrelation is needed: the tap
+# positions themselves (right-hand side) and all pairwise differences.
+_DESIGN_LAGS: tuple[tuple[int, int], ...] = tuple(
+    sorted(
+        set(_FS_POSITIONS)
+        | {(pk[0] - pj[0], pk[1] - pj[1]) for pj in _FS_POSITIONS for pk in _FS_POSITIONS}
+    )
+)
+
+# Margin outside the palette's Oklab bounding box within which the
+# accumulation buffer is allowed to drift in ``dv_diffuse``. Bounds the loop
+# state against quantizer overload with aggressive HVS-optimal filters.
+_CLAMP_MARGIN: float = 0.1
+
+# Scalar Floyd-Steinberg weights as (dy, dx, weight), used only as the
+# fallback filter when the opponent linearization is degenerate.
+_FS_WEIGHTS_FALLBACK: tuple[tuple[int, int, float], ...] = (
+    (0, 1, 7 / 16),
+    (1, -1, 3 / 16),
+    (1, 0, 5 / 16),
+    (1, 1, 1 / 16),
+)
 
 
 @dataclass
@@ -43,16 +85,21 @@ class DVFilters:
     Attributes
     ----------
     weights:
-        Shape ``(4, 3, 3)`` — one 3×3 matrix per FS tap position.
+        Shape ``(4, 3, 3)``: one 3×3 matrix per FS tap position.
         ``weights[k]`` is the tap at ``((0,1), (1,-1), (1,0), (1,1))[k]``.
+        The taps act on Oklab error vectors and always sum to the identity
+        (the DC or "lossless diffusion" constraint).
     K:
-        Shape ``(3, 3)`` — the linear quantiser gain matrix estimated from
-        the palette. ``K ≈ I`` for a broad palette; ``K`` shrinks toward
-        zero along directions the palette barely represents.
+        Shape ``(3, 3)``: the linear quantizer gain matrix estimated from
+        the palette in Oklab. ``K ≈ I`` for a broad palette; ``K`` shrinks
+        toward zero along directions the palette barely represents.
+        Informational: the direct Yule-Walker design does not use it (the
+        white-noise covariance cancels out of the normal equations).
     display_dpi:
         Pixels per inch the filter was designed for.
     viewing_distance_cm:
-        Viewing distance in centimetres the filter was designed for.
+        Viewing distance in centimeters the filter was designed for.
+
     """
 
     weights: np.ndarray
@@ -75,203 +122,118 @@ def _opponent_to_oklab(opp: FloatArray) -> FloatArray:
 
 
 def _nearest_palette_vec(pixels: FloatArray, palette: FloatArray) -> np.ndarray:
-    """Vectorised nearest-palette-index for shape ``(n, 3)``."""
+    """Vectorized nearest-palette-index for shape ``(n, 3)``."""
     return np.argmin(((pixels[:, None, :] - palette[None, :, :]) ** 2).sum(axis=-1), axis=-1)
 
 
-def _hvs_filter(
-    error: FloatArray,
-    sigma_lum: float,
-    sigma_chrom: float,
-) -> FloatArray:
-    """Apply channel-specific Gaussian CSF filters to the error in opponent space.
+def _opponent_jacobian(centre: FloatArray) -> np.ndarray:
+    """Jacobian of :func:`_oklab_to_opponent` at ``centre``, shape (3, 3).
 
-    Luminance channel (O1): narrower Gaussian (sigma_lum).
-    Chrominance channels (O2, O3): wider Gaussian (sigma_chrom).
+    The opponent transform is a nonlinear function of Oklab (through the
+    Oklab→XYZ cube); this is its local linearization, mapping small Oklab
+    error vectors to opponent-space error vectors. Central differences with
+    a fixed step; the map is smooth and locally cubic, so the truncation
+    error is O(1e-10) at the step used.
     """
-    return np.stack([
-        gaussian_filter(error[..., 0], sigma_lum),
-        gaussian_filter(error[..., 1], sigma_chrom),
-        gaussian_filter(error[..., 2], sigma_chrom),
-    ], axis=-1)
+    centre = np.asarray(centre, dtype=np.float64)
+    eps = 1e-5
+    jac = np.zeros((3, 3))
+    for i in range(3):
+        step = np.zeros(3)
+        step[i] = eps
+        jac[:, i] = (_oklab_to_opponent(centre + step) - _oklab_to_opponent(centre - step)) / (
+            2 * eps
+        )
+    return jac
 
 
-def _lagged_correlation(
-    a: FloatArray,
-    b: FloatArray,
-    dy: int,
-    dx: int,
-) -> np.ndarray:
-    """Estimate E[a[y,x] @ b[y-dy, x-dx]^T] from two ``(H, W, 3)`` fields.
+def _kernel_autocorrelation(kernel: FloatArray, dy: int, dx: int) -> float:
+    """Autocorrelation ``sum_n k[n] * k[n + (dy, dx)]`` of a 2D kernel."""
+    size = kernel.shape[0]
+    ys = slice(max(0, -dy), size - max(0, dy))
+    xs = slice(max(0, -dx), size - max(0, dx))
+    yt = slice(max(0, dy), size - max(0, -dy))
+    xt = slice(max(0, dx), size - max(0, -dx))
+    return float((kernel[ys, xs] * kernel[yt, xt]).sum())
 
-    Passing the same field for both ``a`` and ``b`` yields its
-    autocorrelation at lag ``(dy, dx)``; passing a filtered and an unfiltered
-    field yields their cross-correlation.
+
+def _hvs_correlations(
+    transform: np.ndarray,
+    kernels: tuple[FloatArray, ...],
+) -> dict[tuple[int, int], np.ndarray]:
+    """Autocorrelation of the matrix HVS impulse response at each design lag.
+
+    The matrix impulse response is ``W[n] = diag(k_c[n]) @ G`` (per-channel
+    S-CIELAB spatial kernels times the linearized opponent transform), so
+    its autocorrelation factors as ``Phi(Delta) = G^T diag(rho_c(Delta)) G``
+    with ``rho_c`` the scalar autocorrelation of channel ``c``'s kernel.
     """
-    if dy < 0:
-        a = a[:dy, :]
-        b = b[-dy:, :]
-    elif dy > 0:
-        a = a[dy:, :]
-        b = b[:-dy, :]
-    if dx < 0:
-        a = a[:, :dx]
-        b = b[:, -dx:]
-    elif dx > 0:
-        a = a[:, dx:]
-        b = b[:, :-dx]
-    a_flat = a.reshape(-1, 3)
-    b_flat = b.reshape(-1, 3)
-    return (a_flat.T @ b_flat) / a_flat.shape[0]
+    rho = np.array(
+        [[_kernel_autocorrelation(k, dy, dx) for (dy, dx) in _DESIGN_LAGS] for k in kernels]
+    )
+    return {
+        lag: transform.T @ (rho[:, li, None] * transform) for li, lag in enumerate(_DESIGN_LAGS)
+    }
 
 
 def _design_dv_taps(
-    pal_opp: FloatArray,
-    ppd: float,
-    sigma_lum: float,
-    sigma_chrom: float,
-    K: np.ndarray,
+    transform: np.ndarray,
+    kernels: tuple[FloatArray, ...],
+) -> np.ndarray:
+    """Solve the matrix Yule-Walker system for the optimal filter taps.
+
+    Under DV&E's white-noise quantizer model, minimizing the perceived
+    noise energy ``E||W * (u - sum_j h_j u_j)||^2`` gives the generalized
+    Yule-Walker equations (their eq. 63 with eqs. 64-65 substituted):
+
+        sum_j Phi(p_k - p_j) @ h_j = Phi(p_k),   k = 0..3
+
+    where ``Phi(Delta) = sum_n W[n]^T W[n+Delta]``. The DC constraint
+    ``sum_j h_j = I`` (their eq. 43) is imposed exactly with Lagrange
+    multipliers. The taps are left-multiplied by ``Phi``, so with
+    row-major vectorization the Kronecker block is ``kron(Phi, I)``, not
+    the ``(X^T (x) I)`` form that ``vec(h @ X)`` would suggest.
+    """
+    phi = _hvs_correlations(transform, kernels)
+    n = 9 * _N_TAPS
+    M = np.zeros((n, n))
+    rhs = np.zeros(n)
+    for k_idx, pk in enumerate(_FS_POSITIONS):
+        rhs[9 * k_idx : 9 * (k_idx + 1)] = phi[pk].ravel(order="C")
+        for j_idx, pj in enumerate(_FS_POSITIONS):
+            lag = (pk[0] - pj[0], pk[1] - pj[1])
+            M[9 * k_idx : 9 * (k_idx + 1), 9 * j_idx : 9 * (j_idx + 1)] = np.kron(
+                phi[lag], np.eye(3)
+            )
+
+    # Exact DC constraint via Lagrange multipliers:
+    # [M S; S^T 0] [h; lambda] = [rhs; vec(I)] with S summing over taps.
+    S = np.tile(np.eye(9), (_N_TAPS, 1))
+    system = np.zeros((n + 9, n + 9))
+    system[:n, :n] = M
+    system[:n, n:] = S
+    system[n:, :n] = S.T
+    target = np.concatenate([rhs, np.eye(3).ravel(order="C")])
+    solution = np.linalg.lstsq(system, target, rcond=None)[0]
+    return solution[:n].reshape(_N_TAPS, 3, 3)
+
+
+def _quantiser_gain(
+    palette: FloatArray,
+    train_samples: int,
     rng: np.random.Generator,
-    train_size: int = 128,
-    n_iter: int = 3,
-) -> tuple[np.ndarray, list[float]]:
-    """Design matrix-valued filter taps by iterated Yule-Walker solve.
+) -> np.ndarray:
+    """Linear quantizer gain K in Oklab, estimated by Monte-Carlo sampling."""
+    pal_min = palette.min(axis=0) - 0.05
+    pal_max = palette.max(axis=0) + 0.05
+    train = rng.uniform(pal_min, pal_max, size=(train_samples, 3))
+    train_q = palette[_nearest_palette_vec(train, palette)]
 
-    Each iteration: run error diffusion with the current filter on a
-    random training patch, estimate error autocorrelations, solve the
-    matrix Yule-Walker system, and update the taps. The DC constraint
-    (sum of taps = identity) is enforced by projection after each solve.
-
-    Parameters
-    ----------
-    pal_opp:
-        Palette in opponent space, shape ``(n, 3)``.
-    ppd:
-        Pixels per degree of visual angle.
-    sigma_lum, sigma_chrom:
-        Gaussian CSF sigmas in pixel units.
-    K:
-        Linear quantiser gain matrix, shape ``(3, 3)``.
-    rng:
-        Seeded random generator.
-    train_size:
-        Width/height of the square training patch.
-    n_iter:
-        Number of Yule-Walker solve iterations.
-
-    Returns
-    -------
-    ``(weights, loss_values)``: weights has shape ``(4, 3, 3)``.
-    """
-    weights = np.array([np.eye(3) / _N_TAPS for _ in range(_N_TAPS)])
-    losses: list[float] = []
-
-    pal_min = pal_opp.min(axis=0) - 0.05
-    pal_max = pal_opp.max(axis=0) + 0.05
-
-    for _ in range(n_iter):
-        train = rng.uniform(
-            pal_min, pal_max, size=(train_size, train_size, 3)
-        )
-
-        error = _run_diffusion_error(train, pal_opp, weights)
-        e_w = _hvs_filter(error, sigma_lum, sigma_chrom)
-
-        mse = float((e_w ** 2).mean())
-        losses.append(mse)
-
-        M, rhs = _build_yule_walker_system(error, e_w, _FS_POSITIONS)
-        if np.any(~np.isfinite(M)) or np.any(~np.isfinite(rhs)):
-            losses.append(float("nan"))
-            break
-        h_flat = np.linalg.lstsq(M, rhs, rcond=None)[0]
-
-        weights_new = h_flat.reshape(_N_TAPS, 3, 3)
-        correction = (weights_new.sum(axis=0) - np.eye(3)) / _N_TAPS
-        weights = weights_new - correction
-
-    return weights, losses
-
-
-def _build_yule_walker_system(
-    error: FloatArray,
-    e_w: FloatArray,
-    positions: tuple[tuple[int, int], ...],
-) -> tuple[np.ndarray, np.ndarray]:
-    """Assemble the matrix Yule-Walker system for optimal filter taps.
-
-    Minimizes E[||W*e_final||^2] where
-        e_final = e - sum_j h_j @ e_delayed_j.
-
-    The orthogonality principle gives, for each tap k:
-        sum_j h_j @ R(p_j - p_k) = C_W_k
-
-    where R(Δ) = E[e[n] @ e[n-Δ]^T] and
-          C_W_k = E[e_W[n] @ e[n-p_k]^T].
-
-    The system is assembled as a 36×36 matrix using Kronecker products:
-        block(k, j) = R(p_j - p_k)^T ⊗ I_3.
-    """
-    n_taps = len(positions)
-    block_size = 9
-    M = np.zeros((block_size * n_taps, block_size * n_taps))
-    rhs_vec = np.zeros(block_size * n_taps)
-
-    for k_idx in range(n_taps):
-        pk_y, pk_x = positions[k_idx]
-        Ck = _lagged_correlation(e_w, error, pk_y, pk_x)
-        rhs_vec[block_size * k_idx: block_size * (k_idx + 1)] = Ck.ravel(order="F")
-
-        for j_idx in range(n_taps):
-            pj_y, pj_x = positions[j_idx]
-            dy = pj_y - pk_y
-            dx = pj_x - pk_x
-            R_mat = _lagged_correlation(error, error, dy, dx)
-            block = np.kron(R_mat.T, np.eye(3))
-            M[block_size * k_idx: block_size * (k_idx + 1),
-              block_size * j_idx: block_size * (j_idx + 1)] = block
-
-    return M, rhs_vec
-
-
-def _run_diffusion_error(
-    image_opp: FloatArray,
-    palette_opp: FloatArray,
-    weights: np.ndarray,
-) -> FloatArray:
-    """Run matrix-valued error diffusion and return the per-pixel error signal.
-
-    Parameters
-    ----------
-    image_opp:
-        Training image in opponent space, shape ``(H, W, 3)``.
-    palette_opp:
-        Palette in opponent space, shape ``(n, 3)``.
-    weights:
-        Filter taps, shape ``(4, 3, 3)``.
-
-    Returns
-    -------
-    Error field ``(H, W, 3)``: image + feedback - quantised output.
-    """
-    height, width = image_opp.shape[:2]
-    buf = image_opp.copy()
-    error = np.zeros_like(image_opp)
-
-    for y, xs, sign in _scanlines(height, width, serpentine=True):
-        for x in xs:
-            pixel = buf[y, x]
-            index = nearest_palette_index(pixel, palette_opp)
-            e = pixel - palette_opp[index]
-            e = np.clip(e, -1e3, 1e3)
-            error[y, x] = e
-            for k, (dy, dx) in enumerate(_FS_POSITIONS):
-                ny, nx = y + dy, x + sign * dx
-                if 0 <= ny < height and 0 <= nx < width:
-                    buf[ny, nx] += weights[k] @ e
-                    buf[ny, nx] = np.clip(buf[ny, nx], -1e6, 1e6)
-
-    return error
+    x = train - train.mean(axis=0)
+    x_q = train_q - train_q.mean(axis=0)
+    C_x = (x.T @ x) / train_samples
+    C_xq = (x_q.T @ x) / train_samples
+    return C_xq @ np.linalg.inv(C_x)
 
 
 def dv_filters(
@@ -285,9 +247,15 @@ def dv_filters(
 ) -> DVFilters:
     """Design matrix-valued error-diffusion filters for a palette.
 
-    The filter is designed in Poirson-Wandell opponent colour space with
-    channel-specific CSF Gaussian filters. Each FS-position tap is a
-    3×3 matrix, allowing cross-channel coupling.
+    The design follows Damera-Venkata & Evans (2001) Sec. IV: the filter
+    minimizes the perceived energy of the quantizer noise under a
+    pattern-color separable HVS model (the tabulated S-CIELAB spatial
+    kernels of Zhang & Wandell acting on the Poirson-Wandell opponent
+    coordinates, linearized at the palette centroid), subject to the DC
+    constraint that the taps sum to the identity. Under the white-noise
+    quantizer model the generalized Yule-Walker system is linear and is
+    solved directly: no training images or iteration are involved, and
+    the design is deterministic given the palette and viewing geometry.
 
     Parameters
     ----------
@@ -295,55 +263,45 @@ def dv_filters(
         Palette in Oklab, shape ``(n, 3)``.
     display_dpi:
         Pixels per inch. Together with `viewing_distance_cm` determines
-        the visual-angle extent of the CSF Gaussians in pixel units.
+        the visual-angle extent of the HVS kernels in pixel units.
     viewing_distance_cm:
-        Typical viewing distance in centimetres.
+        Typical viewing distance in centimeters.
     train_samples:
-        Number of random colours used to estimate the quantiser gain K.
+        Number of random colors used to estimate the quantizer gain K.
     train_size:
-        Square training patch width/height for the Yule-Walker solve.
+        Unused; retained for backward compatibility. The design is a
+        direct white-noise-model solve, so no training patches are
+        involved.
     seed:
-        Seed for reproducible filter design.
+        Seed for the Monte-Carlo estimation of K (reproducibility).
 
     Returns
     -------
-    :class:`DVFilters` with the designed taps and quantiser gain matrix.
+    :class:`DVFilters` with the designed taps and quantizer gain matrix.
+
+    Raises
+    ------
+    ValueError
+        If `palette_oklab` has fewer than 2 colors.
+
     """
     rng = np.random.default_rng(seed)
     palette = np.asarray(palette_oklab, dtype=np.float64)
     if len(palette) < 2:
-        raise ValueError(f"dv_filters requires at least 2 palette colours, got {len(palette)}")
+        raise ValueError(f"dv_filters requires at least 2 palette colors, got {len(palette)}")
 
-    ppd = pixels_per_degree(display_dpi, viewing_distance_cm)
-    sigma_lum = SIGMA_LUM_DEG * ppd
-    sigma_chrom = SIGMA_CHROM_DEG * ppd
+    # The linearized opponent transform at the palette centroid. For a
+    # degenerate (near-black) centroid the Oklab->XYZ cube makes the
+    # Jacobian ill-conditioned; fall back to scalar Floyd-Steinberg taps,
+    # which are DC-conserving and unconditionally stable.
+    transform = _opponent_jacobian(palette.mean(axis=0))
+    if not np.all(np.isfinite(transform)) or np.linalg.cond(transform) > 1e8:
+        weights = np.array([np.eye(3) * w for _, _, w in _FS_WEIGHTS_FALLBACK])
+    else:
+        kernels = _scielab_kernels(display_dpi, viewing_distance_cm)
+        weights = _design_dv_taps(transform, kernels)
 
-    pal_opp = _oklab_to_opponent(palette)
-
-    # --- estimate quantiser gain K in opponent space ---
-    pal_min = palette.min(axis=0) - 0.05
-    pal_max = palette.max(axis=0) + 0.05
-    train = rng.uniform(pal_min, pal_max, size=(train_samples, 3))
-    train_opp = _oklab_to_opponent(train)
-    indices = _nearest_palette_vec(train_opp, pal_opp)
-    train_q_opp = pal_opp[indices]
-
-    x = train_opp - train_opp.mean(axis=0)
-    x_q = train_q_opp - train_q_opp.mean(axis=0)
-    C_x = (x.T @ x) / train_samples
-    C_xq = (x_q.T @ x) / train_samples
-    K = C_xq @ np.linalg.inv(C_x)
-
-    # --- design filter taps ---
-    weights, _ = _design_dv_taps(
-        pal_opp=pal_opp,
-        ppd=ppd,
-        sigma_lum=sigma_lum,
-        sigma_chrom=sigma_chrom,
-        K=K,
-        rng=rng,
-        train_size=train_size,
-    )
+    K = _quantiser_gain(palette, train_samples, rng)
 
     return DVFilters(
         weights=weights,
@@ -359,15 +317,19 @@ def dv_diffuse(
     filters: DVFilters | None = None,
     shaping: FloatArray | None = None,
     serpentine: bool = True,
+    clamp_margin: float | None = _CLAMP_MARGIN,
 ) -> tuple[FloatArray, np.ndarray]:
-    """Quantise ``image`` to ``palette`` using matrix-valued DV error diffusion.
+    """Quantize ``image`` to ``palette`` using matrix-valued DV error diffusion.
 
-    Diffuses in Poirson-Wandell opponent space with matrix-valued filter
-    taps. If ``filters`` is ``None``, designs a filter for the given
-    palette at the default 100 dpi / 40 cm viewing geometry.
+    Diffuses in Oklab, the space the palette and the quality metrics live
+    in, with matrix-valued filter taps. Diffusing in a nonlinearly related
+    working space (e.g. the opponent space itself) conserves that space's
+    mean instead of Oklab's and shows up as low-frequency tone error in the
+    metrics; the opponent structure of the HVS model is instead folded into
+    the taps at design time via the linearized transform.
 
     ``shaping``, if given, must be a single ``(3, 3)`` global shaping
-    matrix applied in Oklab before error is distributed. Per-cell
+    matrix; it is applied to the Oklab error before distribution. Per-cell
     matrices (``(n, 3, 3)``) are not supported by this function. Use
     :func:`tramage.diffusion.diffuse` for per-cell shaping.
 
@@ -383,11 +345,26 @@ def dv_diffuse(
         Optional single ``(3, 3)`` global shaping matrix.
     serpentine:
         Alternate scan direction each row.
+    clamp_margin:
+        Margin (in Oklab units) outside the palette's per-channel bounding
+        box within which the accumulation buffer may drift before being
+        clamped. HVS-optimal filters are aggressive enough to push the real
+        quantizer loop into overload (the buffer drifts far outside the
+        palette range, the quantizer's effective gain exceeds one, and the
+        loop oscillates), which the linear design model cannot see; the
+        clamp is the standard practical stabilizer. ``None`` disables it.
 
     Returns
     -------
-    ``(dithered, indices)``: the quantised image in Oklab and the
+    ``(dithered, indices)``: the quantized image in Oklab and the
     per-pixel palette index.
+
+    Raises
+    ------
+    ValueError
+        If `shaping` is not a single ``(3, 3)`` matrix; per-cell
+        ``(n, 3, 3)`` shaping matrices are not supported.
+
     """
     image_oklab = np.asarray(image_oklab, dtype=np.float64)
     palette_oklab = np.asarray(palette_oklab, dtype=np.float64)
@@ -404,31 +381,31 @@ def dv_diffuse(
                 f"per-cell shaping."
             )
 
-    # Convert image and palette to opponent space for the diffusion loop.
-    image_opp = _oklab_to_opponent(image_oklab)
-    pal_opp = _oklab_to_opponent(palette_oklab)
     weights = filters.weights
 
-    height, width = image_opp.shape[:2]
-    buf = image_opp.copy()
+    height, width = image_oklab.shape[:2]
+    buf = image_oklab.copy()
     indices = np.zeros((height, width), dtype=np.int64)
+
+    if clamp_margin is not None:
+        buf_lo = palette_oklab.min(axis=0) - clamp_margin
+        buf_hi = palette_oklab.max(axis=0) + clamp_margin
 
     for y, xs, sign in _scanlines(height, width, serpentine):
         for x in xs:
             pixel = buf[y, x]
-            index = nearest_palette_index(pixel, pal_opp)
+            index = nearest_palette_index(pixel, palette_oklab)
             indices[y, x] = index
-            error = pixel - pal_opp[index]
+            error = pixel - palette_oklab[index]
 
             if shaping is not None:
-                err_ok = _opponent_to_oklab(error)
-                err_ok = shaping @ err_ok
-                error = _oklab_to_opponent(err_ok)
+                error = shaping @ error
 
             for k, (dy, dx) in enumerate(_FS_POSITIONS):
                 ny, nx = y + dy, x + sign * dx
                 if 0 <= ny < height and 0 <= nx < width:
                     buf[ny, nx] += weights[k] @ error
+                    if clamp_margin is not None:
+                        np.clip(buf[ny, nx], buf_lo, buf_hi, out=buf[ny, nx])
 
-    dithered_opp = pal_opp[indices]
-    return _opponent_to_oklab(dithered_opp), indices
+    return palette_oklab[indices], indices

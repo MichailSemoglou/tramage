@@ -54,6 +54,7 @@ def _load() -> list[dict]:
 
 
 def plot_metrics_vs_K(rows: list[dict]) -> None:
+    """Metrics by K: median line per config with a 25-75% band across images."""
     Ks = sorted({int(r["K"]) for r in rows})
     fig, axes = plt.subplots(1, len(METRICS), figsize=(11, 4.8))
     for ax, (metric, label) in zip(axes, METRICS):
@@ -73,8 +74,9 @@ def plot_metrics_vs_K(rows: list[dict]) -> None:
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
     axes[0].legend(title="config", fontsize=8, loc="upper right")
-    fig.suptitle("Kodak dithering quality: Floyd-Steinberg vs Kolpatzik-Bouman baseline\n"
-                 "(line = median across 24 images; band = 25-75 percentile)", fontsize=11)
+    fig.suptitle("Dithering quality by K: Floyd-Steinberg vs Kolpatzik-Bouman vs Damera-Venkata\n"
+                 "(line = median across 124 images, Kodak24 + CQ100; band = 25-75 percentile)",
+                 fontsize=11)
     fig.tight_layout()
     fig.savefig(RESULTS / "metrics_vs_K.png", dpi=130)
     plt.close(fig)

@@ -43,19 +43,24 @@ these tables do not recompute from `results/kbbaseline.csv`):
   a low-frequency floor (~0.010–0.012) that does not collapse as K grows,
   while FS's low-frequency error falls to 0.0025. Verified per-image: KB's
   bias stays ~0.001–0.002 across K while FS's falls to ~0.0004.
-- **DV is currently worse, and the obvious causes are ruled out.** At K=32 on
-  kodim01 (single image), DV gives `lowfreq_frac = 0.0862` (34× FS) and
-  `bias_norm = 0.00328` (8× FS). Three checks clear the suspects: **zero clip
-  events** during filter design (the ±1e3/±1e6 clipping never fires), an
-  **exact opponent round-trip** (distortion 0.0), and **DC-conserving taps**
-  with a clean constant-image output (error 0.0). The remaining suspect is the
-  synthetic-training filter design not generalising to real-image spectra.
-  DV is disabled in the run (`RUN_DV = False`) until resolved.
+- **DV's low-frequency excess is resolved; the filter is enabled**
+  (`RUN_DV = True`). An earlier version of this bullet documented a 34× FS
+  `lowfreq_frac` excess on kodim01 with the obvious causes (clipping in the
+  design, opponent round-trip error, DC non-conservation of the taps) ruled
+  out. The rewrite of `tramage.dv_filter` found and fixed three defects in
+  the old design: it diffused in a **nonlinear opponent working space**, so
+  Jensen bias leaked image-correlated low-frequency error into the metric
+  space; its Yule-Walker assembly had a **wrong Kronecker ordering**; and
+  its **iterated synthetic-training design was unstable**. The training-free
+  closed-form design in Oklab conserves DC in the metric space by
+  construction. S-CIELAB results are in the DV section below.
 
 **Consequence:** any claim that rests on `noise_L` comparing FS against
-KB/DV is provisional until the re-run produces S-CIELAB ΔE, the one metric
-that applies spatial CSF weighting and can actually see what an HVS filter
-does. S-CIELAB is the arbiter; `noise_L` is not.
+KB/DV was provisional only until the re-run produced S-CIELAB ΔE, the one
+metric that applies spatial CSF weighting and can actually see what an HVS
+filter does. S-CIELAB is the arbiter; `noise_L` is not. The arbiter tables
+below (the interaction table and the DV results section) supersede every
+`noise_L` comparison in this README.
 
 ## Provisional observation, to be confirmed by S-CIELAB
 
@@ -173,14 +178,18 @@ the ratio throughout.
   filters, one per opponent channel (Y, rg, yb), minimising perceived error
   variance under per-channel CSFs. Uses the published coefficients directly.
 - **DV matrix filter** (`tramage.dv_filter`): the full Damera-Venkata matrix
-  taps, designed per palette by solving a Yule-Walker system in
-  Poirson-Wandell opponent space. The exact prior art, not a special case.
+  taps, designed per palette by a closed-form (training-free) Yule-Walker
+  solve. The diffusion runs in Oklab, the metric space; the Poirson-Wandell
+  opponent map enters the design only through its Jacobian at the palette
+  centroid, the spatial CSFs are the tabulated Zhang-Wandell S-CIELAB
+  kernels, and the DC constraint (taps summing to the identity) is imposed
+  exactly via Lagrange multipliers. The exact prior art, not a special case.
 
-Both filters run through the same approximate opponent transform, a
-documented limitation: the comparison is indicative rather than definitive
-against a faithful linear-RGB pipeline. The same caution applies to DV as to
-KB — evaluated primarily on error variance, DV will be understated for the
-same reason.
+KB still runs in the kolpatzik1992 opponent space. For DV the remaining
+caveat is one of domain, not of approximation: the implementation is an
+Oklab-domain reimplementation of DV&E, not a device-linear-RGB port of the
+original pipeline. The metric caution applies to DV as to KB: evaluated
+primarily on error variance, DV will be understated for the same reason.
 
 ## Disambiguation: this is not Damera-Venkata
 
@@ -192,6 +201,70 @@ absorb. Different objects answering different questions, and they compose —
 the `kb-shaped`/`dv-shaped` configs apply both. The `cell` variant is
 additionally spatially adaptive where a DV&E matrix is fixed for the image.
 
+## DV results: the full matrix filter under S-CIELAB
+
+The 8 Sep re-run enabled the rewritten DV filter (`RUN_DV = True`), taking
+the run to six configs and 4464 trials. `analyze_dv.py` recomputes the
+tables below from `results/kbbaseline.csv`. Entries are median per-image %
+S-CIELAB ΔE reductions with two-sided Wilcoxon signed-rank p-values;
+positive means the first config of the pair has lower ΔE.
+
+**Shaping on top of the DV filter** (dv-baseline → dv-shaped, pooled,
+n = 124):
+
+| K | median % ΔE reduction | Wilcoxon p |
+|---|---|---|
+| 8 | +1.0% | 8.6×10⁻⁴ |
+| 16 | +1.4% | 0.044 |
+| 32 | +1.5% | 0.28 |
+| 64 | +2.4% | 0.12 |
+| 128 | +1.5% | 0.75 |
+| 256 | −0.3% | 0.62 |
+
+**The same comparison, split by corpus:**
+
+| K | Kodak (n=24) | CQ100 (n=100) |
+|---|---|---|
+| 8 | −1.2% (p = 0.029) | +1.3% (p = 3.8×10⁻⁶) |
+| 16 | −7.0% (p = 0.0011) | +1.8% (p = 9.5×10⁻⁵) |
+| 32 | −11.0% (p = 1.7×10⁻⁶) | +3.0% (p = 4.5×10⁻⁴) |
+| 64 | −18.6% (p = 3.0×10⁻⁶) | +4.4% (p = 1.9×10⁻⁵) |
+| 128 | −23.5% (p = 3.9×10⁻⁶) | +3.4% (p = 0.0022) |
+| 256 | −30.6% (p = 1.2×10⁻⁷) | +2.7% (p = 0.0095) |
+
+**Against the other filters** (pooled, n = 124):
+
+| K | fs-shaped vs dv-baseline | dv-baseline vs fs-baseline | dv-baseline vs kb-baseline |
+|---|---|---|---|
+| 8 | +0.4% (p = 0.24) | +17.4% | +16.9% |
+| 16 | +2.4% (p = 0.0044) | +21.7% | +21.8% |
+| 32 | +3.1% (p = 0.028) | +18.3% | +24.2% |
+| 64 | +3.2% (p = 0.028) | +9.8% | +24.0% |
+| 128 | +2.0% (p = 0.27) | +6.8% | +23.2% |
+| 256 | −1.3% (p = 0.75) | +3.6% | +22.1% |
+
+(p-values in the last two columns: all ≤ 0.012 against fs-baseline, all
+< 10⁻²⁰ against kb-baseline.)
+
+Three conclusions:
+
+1. **The DV filter is the strongest unshaped baseline.** Its median ΔE is
+   the lowest of the three unshaped filters at every K (Table A of
+   `analyze_dv.py`), 3.6–21.7% below fs-baseline and 16.9–24.2% below
+   kb-baseline, with the margin over FS largest in the small-to-moderate-K
+   regime of interest.
+2. **The shaping × filter overlap is nearly complete for the full matrix
+   filter.** Shaping adds 1–2% pooled on top of DV, and even that splits
+   by corpus: a small but significant gain on CQ100 at every K, a growing
+   harm on Kodak from K=16 (−7.0% to −30.6%). The matrix filter already
+   routes error into the frequencies and opponent channels the eye is
+   least sensitive to, which is most of what palette-geometry shaping
+   provides on top of the weaker filters.
+3. **Shaped Floyd-Steinberg matches or beats the DV baseline at K ≤ 64**
+   (+0.4% at K=8, a null; +2.4% to +3.2% at K=16–64, p ≤ 0.028), so
+   palette-geometry shaping delivers prior-art-level quality at one 3×3
+   matrix multiply per pixel, without a per-palette filter design.
+
 ## Configurations
 
 | Parameter | Value |
@@ -199,8 +272,8 @@ additionally spatially adaptive where a DV&E matrix is fixed for the image.
 | Corpus | Kodak24 + CQ100 (124 images, 768×512 / 512×768) |
 | Palette sizes | K ∈ {8, 16, 32, 64, 128, 256} |
 | Seed | 0 |
-| Configs per trial | 4 (FS/KB × baseline/shaped; DV disabled) |
-| Total trials | 2976 (124 × 6 × 4) |
+| Configs per trial | 6 (FS/KB/DV × baseline/shaped; `RUN_DV = True`) |
+| Total trials | 4464 (124 × 6 × 6) |
 | `eps` | `DEFAULT_EPS = 0.02²` |
 | Diffusion | FS, KB scalar, DV matrix — all serpentine |
 
@@ -210,6 +283,7 @@ additionally spatially adaptive where a DV&E matrix is fixed for the image.
 python experiments/kb_baseline/run_kbbaseline.py        # ~25 min
 python experiments/kb_baseline/plot_kbbaseline.py       # metrics + relative + interaction PNGs
 python experiments/kb_baseline/analyze_interaction.py   # trend test + per-K TOST
+python experiments/kb_baseline/analyze_dv.py            # DV tables (S-CIELAB, Wilcoxon)
 ```
 
 ## Verdict
@@ -303,10 +377,13 @@ at every K with confidence" no longer holds at large K, and is not claimed.
   under the corrected kernels), with per-K TOSTs secondary. On S-CIELAB the
   interaction is positive with clear CIs at K ≤ 32 and fades with the main
   effect; no large-K sign change is claimed.
-- **DV&E remains disabled** (`RUN_DV = False`): its synthetic-training filter
-  design does not generalise to real-image spectra (see above), so the scalar
-  KB result is what the paper reports. The metric-blindness caveat applies to
-  DV for the same reason it applies to KB.
+- **DV&E is now enabled** (`RUN_DV = True`) after the closed-form redesign,
+  and it changes the baseline story: the full matrix filter is the strongest
+  unshaped baseline, shaping adds nothing reliable on top of it (a small
+  CQ100-only gain, harmful on Kodak from K=16), and shaped FS matches or
+  beats the DV baseline at K ≤ 64 (see the DV results section). The
+  metric-blindness caveat applies to DV for the same reason it applies to
+  KB.
 - The tone trade-off (K ≥ 128) is stated as a limitation in the paper, not
   only here.
 

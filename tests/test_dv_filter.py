@@ -29,12 +29,15 @@ def test_dv_filters_returns_correct_shapes():
 
 
 def test_dv_filters_taps_are_not_identity():
-    """The designed matrix taps should differ from the FS scalar identity/4."""
+    """The designed matrix taps should differ from the uniform DC-preserving split.
+
+    The trivial geometry-blind split is identity/4 per tap; the design
+    should exploit palette geometry instead.
+    """
     rng = np.random.default_rng(1)
     palette = srgb_to_oklab(rng.uniform(size=(6, 3)))
     f = dv_filters(palette, seed=2)
     identity_quarter = np.eye(3) / 4
-    # At least one tap should differ from identity/4.
     assert not np.allclose(f.weights, identity_quarter)
 
 
@@ -61,11 +64,13 @@ def test_dv_diffuse_output_uses_only_palette_colours():
     f = dv_filters(palette, seed=6)
     dithered, indices = dv_diffuse(image, palette, f)
     assert set(np.unique(indices)).issubset(set(range(len(palette))))
+    # dv_diffuse returns palette_oklab[indices], an exact gather, so this
+    # tolerance is defensive rather than a bound on numerical error.
     assert np.allclose(dithered, palette[indices], atol=1e-4)
 
 
 def test_dv_diffuse_exact_palette_colour_reproduces_it():
-    """A flat image made entirely of one palette colour should dither losslessly."""
+    """A flat image made entirely of one palette color should dither losslessly."""
     palette = srgb_to_oklab(np.array([[0.6, 0.1, 0.3], [0.2, 0.8, 0.5]]))
     image = np.tile(palette[0], (10, 10, 1))
     f = dv_filters(palette, seed=7)
@@ -170,17 +175,26 @@ def test_dv_filters_custom_geometry():
 
 
 def test_dv_diffuse_with_shaping_and_degenerate_palette():
-    """Shaping is inert on an exactly degenerate palette even in DV diffusion."""
+    """Shaping is inert on an exactly rank-deficient palette, even in DV diffusion.
+
+    Every palette color shares the same b, so the b part of the buffer state
+    contributes an identical constant to every candidate's squared distance
+    and can never change which color is nearest, and the shaping matrix
+    annihilates the b error exactly (zero eigenvalue, zero gain). The image
+    adds off-plane demand in b, so there is real error to shape: the
+    unshaped run diffuses the full error through the matrix-valued taps, the
+    shaped run a b-free one, and the two must still choose the same palette
+    index at every pixel. Without the off-plane demand every pixel would
+    quantize with zero error and the assertion would pass vacuously.
+    """
     b_plane = 0.02
     Ls = [0.40, 0.55, 0.70]
     As = [-0.08, 0.00, 0.08]
-    rgb_palette = np.array([[L, a, b_plane] for L in Ls for a in As])
-    rgb_palette = np.clip(rgb_palette, 0, 1)
-    palette = srgb_to_oklab(rgb_palette)
+    palette = np.array([[L, a, b_plane] for L in Ls for a in As])
 
     rng = np.random.default_rng(23)
     image = palette[rng.integers(0, len(palette), size=(20, 20))].astype(np.float64)
-    image = np.clip(image, -0.5, 1.5)
+    image[..., 2] += rng.normal(scale=0.05, size=(20, 20))  # off-plane demand
 
     f = dv_filters(palette, seed=24)
     M, _, _ = global_shaping_matrix(palette, eps=0.02 ** 2)
@@ -188,4 +202,4 @@ def test_dv_diffuse_with_shaping_and_degenerate_palette():
     shaped, shaped_idx = dv_diffuse(image, palette, f, shaping=M)
 
     assert np.array_equal(unshaped_idx, shaped_idx)
-    assert np.allclose(unshaped, shaped, atol=1e-4)
+    assert np.array_equal(unshaped, shaped)

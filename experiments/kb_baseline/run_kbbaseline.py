@@ -1,18 +1,16 @@
-"""Filter baseline experiment: shaping vs HVS-optimised filters.
+"""Filter baseline experiment: shaping vs HVS-optimized filters.
 
-Four active configurations per (image, K) — an FS/KB x baseline/shaped design:
+Six configurations per (image, K) when RUN_DV is true (four otherwise),
+three filters x baseline/shaped:
 
 - ``fs-baseline`` / ``fs-shaped``: Floyd-Steinberg, without / with shaping.
 - ``kb-baseline`` / ``kb-shaped``: Kolpatzik-Bouman scalar HVS filter (the
   separable special case of Damera-Venkata), without / with shaping.
+- ``dv-baseline`` / ``dv-shaped``: matrix-valued Damera-Venkata filter,
+  without / with shaping.
 
-The FS/KB pair is a 2x2 factorial whose interaction is analysed in
+The FS/KB pair is a 2x2 factorial whose interaction is analyzed in
 ``analyze_interaction.py``.
-
-The matrix-valued Damera-Venkata filter (``dv-baseline`` / ``dv-shaped``) is
-disabled pending a design fix: 0 clip events, an exact opponent round-trip,
-and DC-conserving taps, yet high bias and low-frequency error on real images
-(see ROADMAP). Set ``RUN_DV = True`` to re-enable.
 
 Crash-safe (append-per-trial, dedupe at end). Same pattern as the other
 harnesses.
@@ -62,10 +60,9 @@ FIELDS = [
     "git_sha", "corpus_sha256",
 ]
 
-# DV (matrix-valued Damera-Venkata) is disabled until its design is fixed:
-# 0 clip events, exact opponent round-trip, DC-conserving taps, clean
-# constant-image output, yet high bias/lowfreq on real images (see ROADMAP).
-RUN_DV = False
+# DV (matrix-valued Damera-Venkata): training-free closed-form design in
+# Oklab; see README.
+RUN_DV = True
 CONFIGS = (
     "fs-baseline", "fs-shaped", "kb-baseline", "kb-shaped",
 ) + (("dv-baseline", "dv-shaped") if RUN_DV else ())
@@ -140,7 +137,7 @@ def _timing_probe(images: list[Path], n: int | None = None) -> float:
 
 def main() -> None:
     # Kodak24 + CQ100 (124 images): this experiment's README and the
-    # 2976-row kbbaseline.csv the paper cites cover both corpora.
+    # 4464-row kbbaseline.csv the paper cites cover both corpora.
     corpora = corpus_dirs(CORPORA)
     if not corpora:
         raise SystemExit(
@@ -156,7 +153,7 @@ def main() -> None:
     for corpus in corpora:
         all_images += images_in(corpus)
     if not all_images:
-        raise SystemExit("no .png/.jpg images found in any corpus")
+        raise SystemExit("no .png/.jpg/.ppm images found in any corpus")
 
     prov = provenance(all_images, HERE.parent.parent)
 

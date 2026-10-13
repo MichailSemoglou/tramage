@@ -3,13 +3,13 @@
 The FS/KB pair is a 2x2 factorial. This script reports the interaction two
 ways, with the trend test as the PRIMARY analysis:
 
-- **Primary — trend test.** A **Jonckheere-Terpstra** ordered-trend test
+- **Primary: trend test.** A **Jonckheere-Terpstra** ordered-trend test
   across K, which tests a monotonic decline without committing to a functional
   form (a linear-in-log₂(K) fit is a poor model of the plateauing interaction,
   so its slope and p-value would inherit that misspecification). Reports the JT
   statistic and its one-sided p; the mean per-image linear slope is reported as
   a descriptive effect size only.
-- **Secondary — per-K TOST.** A two-one-sided-tests equivalence test per K
+- **Secondary: per-K TOST.** A two-one-sided-tests equivalence test per K
   against a pre-specified margin, theta = 0.25 x the pooled shaping benefit,
   with a 90% bootstrap CI. Used to locate the crossing point, not as six
   independent findings.

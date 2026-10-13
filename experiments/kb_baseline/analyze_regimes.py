@@ -2,24 +2,19 @@
 
 The observation: the Kolpatzik-Bouman filter's low-frequency excess over
 Floyd-Steinberg (``kb-baseline - fs-baseline`` in ``lowfreq_frac``) changes
-sign around a baseline low-frequency energy fraction of ~0.02 — below it KB
-sits on a DC-leak floor, above it the HVS weighting wins. This split was
-observed after the re-run (it is not in `PREREGISTRATION.md`), and the 0.02
-boundary was chosen by eye, so this script reports the finding the honest
-way:
+sign around a baseline low-frequency energy fraction of ~0.02: below it KB
+sits on a DC-leak floor, above it the HVS weighting wins. This split is
+exploratory: it post-dates the preregistration and the 0.02 boundary was
+chosen by eye, so this script reports the finding with robustness checks.
 
-1. **Threshold robustness** — the same medians at thresholds 0.01, 0.015,
-   0.02, and 0.03, over the figure's K window (16-64) and over all K.
+1. **Threshold robustness**: the same medians at thresholds 0.01, 0.015,
+   0.02, and 0.03, over the K=16-64 window and over all K.
 2. **Per-K split** at the 0.02 threshold, because baseline lowfreq_frac is
    strongly K-dependent: the below/above split partly re-describes K.
-3. **The perceptual caveat** — the share of cells where KB beats FS on
+3. **The perceptual caveat**: the share of cells where KB beats FS on
    S-CIELAB ΔE per regime. The regime finding is a low-frequency-energy
    statement; on the primary endpoint KB does not win the above-boundary
    regime.
-
-Also reconciles the two published cuts: ROADMAP section 8 (19 Aug) quotes
-+0.0053 / -0.0109 and Figure 1 shows +0.005 / -0.006; the difference is the
-K window (all K vs 16-64), not a discrepancy — both are printed here.
 
 Run from the repository root, after run_kbbaseline.py::
 
@@ -51,8 +46,11 @@ def regime_stats(
     cells: list[tuple[float, float, float, float]],
     threshold: float,
 ) -> tuple[list[float], list[float], float, float]:
-    """Split cells on baseline lowfreq; return (excess below, excess above,
-    KB S-CIELAB win rate below, win rate above)."""
+    """Split cells on baseline lowfreq and report per-regime statistics.
+
+    Returns (excess below, excess above, KB S-CIELAB win rate below, win rate
+    above).
+    """
     lo = [(lf, ex, fs_de, kb_de) for lf, ex, fs_de, kb_de in cells if lf < threshold]
     hi = [(lf, ex, fs_de, kb_de) for lf, ex, fs_de, kb_de in cells if lf >= threshold]
 
