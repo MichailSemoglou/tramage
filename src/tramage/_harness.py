@@ -17,9 +17,13 @@ import hashlib
 import subprocess
 from collections.abc import Callable, Hashable
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from PIL import Image
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsRichComparison
 
 from .colour import oklab_to_srgb, srgb_to_oklab
 from .metrics import (
@@ -34,6 +38,10 @@ from .metrics import (
 # A callable that reduces one CSV row (a dict) to a hashable identity key,
 # used both to skip already-computed trials and to dedupe the final CSV.
 Key = Callable[[dict], Hashable]
+
+# A callable that reduces one CSV row to an orderable value for sorting.
+# Identity keys only need to be hashable; sort keys must also be orderable.
+SortKey = Callable[[dict], "SupportsRichComparison"]
 
 # Image suffixes recognized across the corpora (Kodak is PNG; CQ100 may add PPM).
 IMAGE_SUFFIXES = (".png", ".jpg", ".ppm")
@@ -103,7 +111,7 @@ def finalise_csv(
     csv_path: Path,
     fields: list[str],
     key: Key,
-    sort_key: Key | None = None,
+    sort_key: SortKey | None = None,
 ) -> None:
     """Dedupe and sort the CSV in place. Idempotent; safe to call repeatedly."""
     if not csv_path.exists():
@@ -118,7 +126,11 @@ def finalise_csv(
             continue
         seen.add(k)
         unique.append(row)
-    unique.sort(key=sort_key or key)
+    # The identity key doubles as the sort key when no explicit one is
+    # given; the keys used here return (str, int) tuples, which are
+    # orderable, so the cast only narrows for the type checker.
+    effective_key = cast("SortKey", sort_key if sort_key is not None else key)
+    unique.sort(key=effective_key)
     with csv_path.open("w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
