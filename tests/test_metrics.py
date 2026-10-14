@@ -1,6 +1,7 @@
 """Tests for fidelity and noise metrics."""
 
 import numpy as np
+import pytest
 
 from tramage.metrics import (
     blurred_tone_error,
@@ -261,3 +262,21 @@ def test_scielab_de_unknown_filters_raises():
     img = srgb_to_oklab(np.full((8, 8, 3), 0.5))
     with pytest.raises(ValueError, match="unknown filters"):
         scielab_de(img, img, filters="boxcar")
+
+
+def test_lowfreq_energy_fraction_rejects_out_of_range_channel():
+    """A channel index past the channel count raises a clear ValueError."""
+    rng = np.random.default_rng(0)
+    a = rng.uniform(size=(8, 8, 3))
+    b = rng.uniform(size=(8, 8, 3))
+    with pytest.raises(ValueError, match="channel"):
+        lowfreq_energy_fraction(a, b, channel=3)
+
+
+def test_spectral_anisotropy_rejects_out_of_range_channel():
+    """A channel index past the channel count raises a clear ValueError."""
+    rng = np.random.default_rng(0)
+    a = rng.uniform(size=(8, 8, 3))
+    b = rng.uniform(size=(8, 8, 3))
+    with pytest.raises(ValueError, match="channel"):
+        spectral_anisotropy(a, b, channel=3)

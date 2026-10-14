@@ -4,6 +4,7 @@ Kernel energy, palette membership, and interaction with shaping matrices.
 """
 
 import numpy as np
+import pytest
 
 from tramage.diffusion import DEFAULT_WEIGHTS, _scanlines, diffuse
 from tramage.shaping import global_shaping_matrix, per_cell_shaping_matrices
@@ -128,3 +129,23 @@ def test_scanlines_raster():
     for y, xs, sign in rows:
         assert sign == 1
         assert list(xs) == list(range(4))
+
+
+def test_diffuse_rejects_bad_image_shape():
+    """A non-(H, W, 3) image raises a clear ValueError at the boundary."""
+    palette = np.array([[0.5, 0.0, 0.0], [0.6, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="shape"):
+        diffuse(np.zeros((8, 8, 4)), palette)
+
+
+def test_diffuse_rejects_empty_palette():
+    """An empty palette raises a clear ValueError at the boundary."""
+    with pytest.raises(ValueError, match="n >= 1"):
+        diffuse(np.zeros((8, 8, 3)), np.zeros((0, 3)))
+
+
+def test_diffuse_rejects_nonfinite_palette():
+    """A palette containing NaN raises a clear ValueError at the boundary."""
+    palette = np.array([[0.5, 0.0, 0.0], [np.nan, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="non-finite"):
+        diffuse(np.zeros((8, 8, 3)), palette)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tramage"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Palette-structure-aware error diffusion dithering."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
@@ -33,6 +34,7 @@ dependencies = [
 image = ["pillow>=10.0"]
 dev = [
     "pytest>=7.4",
+    "pytest-cov>=4.1",
     "ruff>=0.4",
     "pillow>=10.0",
 ]
@@ -45,8 +47,25 @@ Issues = "https://github.com/MichailSemoglou/tramage/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/tramage"]
 
+[tool.hatch.version]
+path = "src/tramage/__init__.py"
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 50
+
+[tool.codespell]
+skip = ".git,*.pdf,*.png,*.csv,.venv"
+ignore-words-list = "oklab,nd,hist"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["--durations=10"]
+# Warnings are errors: deprecations surface here, not in production.
+filterwarnings = ["error"]
 
 [tool.ruff]
 line-length = 100

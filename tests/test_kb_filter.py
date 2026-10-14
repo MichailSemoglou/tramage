@@ -1,6 +1,7 @@
 """Tests for the Kolpatzik-Bouman filter and diffusion function."""
 
 import numpy as np
+import pytest
 
 from tramage.colour import srgb_to_oklab
 from tramage.diffusion import diffuse
@@ -93,3 +94,23 @@ def test_kb_filters_match_published_table1():
         [0.8767, 0.0359, 0.8205, -0.7376],   # chrominance (yb)
     ])
     np.testing.assert_allclose(kb_filters().weights, expected, atol=1e-12)
+
+
+def test_kb_diffuse_rejects_bad_image_shape():
+    """A non-(H, W, 3) image raises a clear ValueError at the boundary."""
+    palette = np.array([[0.5, 0.0, 0.0], [0.6, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="shape"):
+        kb_diffuse(np.zeros((8, 8, 4)), palette)
+
+
+def test_kb_diffuse_rejects_empty_palette():
+    """An empty palette raises a clear ValueError at the boundary."""
+    with pytest.raises(ValueError, match="n >= 1"):
+        kb_diffuse(np.zeros((8, 8, 3)), np.zeros((0, 3)))
+
+
+def test_kb_diffuse_rejects_nonfinite_palette():
+    """A palette containing NaN raises a clear ValueError at the boundary."""
+    palette = np.array([[0.5, 0.0, 0.0], [np.nan, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="non-finite"):
+        kb_diffuse(np.zeros((8, 8, 3)), palette)

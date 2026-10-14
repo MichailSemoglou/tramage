@@ -117,7 +117,16 @@ def lowfreq_energy_fraction(
         Radius of the low-frequency disc as a fraction of the Nyquist
         frequency (default 0.10).
 
+    Raises
+    ------
+    ValueError
+        If `channel` is out of range for the image's channel count.
+
     """
+    if not 0 <= channel < dithered.shape[-1]:
+        raise ValueError(
+            f"channel must be in [0, {dithered.shape[-1]}), got {channel}"
+        )
     e = error(dithered, original)[..., channel]
     e = e - e.mean()
     height, width = e.shape
@@ -166,7 +175,16 @@ def spectral_anisotropy(
     bins:
         Number of angular bins the band is divided into (default 18).
 
+    Raises
+    ------
+    ValueError
+        If `channel` is out of range for the image's channel count.
+
     """
+    if not 0 <= channel < dithered.shape[-1]:
+        raise ValueError(
+            f"channel must be in [0, {dithered.shape[-1]}), got {channel}"
+        )
     e = error(dithered, original)[..., channel]
     e = e - e.mean()
     height, width = e.shape

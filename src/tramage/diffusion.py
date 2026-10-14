@@ -34,6 +34,18 @@ def nearest_palette_index(pixel: FloatArray, palette: FloatArray) -> int:
     return int(np.argmin(((palette - pixel) ** 2).sum(axis=-1)))
 
 
+def _validate_inputs(image: FloatArray, palette: FloatArray) -> None:
+    """Reject malformed diffusion inputs with a clear message."""
+    if image.ndim != 3 or image.shape[-1] != 3:
+        raise ValueError(f"image must have shape (H, W, 3), got {image.shape}")
+    if palette.ndim != 2 or palette.shape[0] == 0 or palette.shape[1] != 3:
+        raise ValueError(
+            f"palette must have shape (n, 3) with n >= 1, got {palette.shape}"
+        )
+    if not np.isfinite(palette).all():
+        raise ValueError("palette contains non-finite values")
+
+
 def _shape_error(e: FloatArray, index: int, shaping: FloatArray | None) -> FloatArray:
     if shaping is None:
         return e
@@ -102,9 +114,17 @@ def diffuse(
     A tuple ``(dithered, indices)``: the quantized image made of palette
     colors, and the palette index chosen at each pixel.
 
+    Raises
+    ------
+    ValueError
+        If `image` is not ``(H, W, 3)``, if `palette` is not ``(n, 3)``
+        with ``n >= 1``, if `palette` contains non-finite values, or if
+        `shaping` has an unsupported shape.
+
     """
     image = np.asarray(image, dtype=np.float64)
     palette = np.asarray(palette, dtype=np.float64)
+    _validate_inputs(image, palette)
     if shaping is not None:
         shaping = np.asarray(shaping, dtype=np.float64)
 

@@ -1,0 +1,36 @@
+# Release workflow: on a version tag (v*), build the distribution and
+# publish to PyPI via the PyPA trusted-publisher action (OIDC; no token).
+# One-time setup: on PyPI, add a trusted publisher for repository
+# MichailSemoglou/tramage, workflow publish.yml, environment pypi.
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check the distribution
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,12 +1,14 @@
 """Tests for color conversion.
 
-sRGB <-> Oklab round trips, in_gamut bounds checks, the srgb_to_linear
-negative-input warning contract, and the CIELAB (D65) suite.
+sRGB <-> Oklab/CIELAB round trips (parametrized over both spaces), in_gamut
+bounds checks, the srgb_to_linear negative-input warning contract, and the
+CIELAB (D65) anchor values.
 """
 
 import warnings
 
 import numpy as np
+import pytest
 
 from tramage.colour import (
     cielab_to_srgb,
@@ -17,29 +19,33 @@ from tramage.colour import (
     srgb_to_oklab,
 )
 
+ROUND_TRIPS = [
+    pytest.param(srgb_to_oklab, oklab_to_srgb, id="oklab"),
+    pytest.param(srgb_to_cielab, cielab_to_srgb, id="cielab"),
+]
 
-def test_round_trip_grid_of_colours():
+
+@pytest.mark.parametrize("to_space,from_space", ROUND_TRIPS)
+def test_round_trip_grid_of_colors(to_space, from_space):
     rng = np.random.default_rng(0)
     rgb = rng.uniform(0.0, 1.0, size=(200, 3))
-    lab = srgb_to_oklab(rgb)
-    back = oklab_to_srgb(lab)
-    assert np.allclose(rgb, back, atol=1e-8)
+    assert np.allclose(rgb, from_space(to_space(rgb)), atol=1e-8)
 
 
-def test_round_trip_preserves_shape():
+@pytest.mark.parametrize("to_space,from_space", ROUND_TRIPS)
+def test_round_trip_preserves_shape(to_space, from_space):
     rng = np.random.default_rng(1)
     rgb = rng.uniform(0.0, 1.0, size=(8, 5, 3))
-    lab = srgb_to_oklab(rgb)
+    lab = to_space(rgb)
     assert lab.shape == rgb.shape
-    back = oklab_to_srgb(lab)
+    back = from_space(lab)
     assert back.shape == rgb.shape
 
 
-def test_black_and_white_round_trip():
+@pytest.mark.parametrize("to_space,from_space", ROUND_TRIPS)
+def test_black_and_white_round_trip(to_space, from_space):
     rgb = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
-    lab = srgb_to_oklab(rgb)
-    back = oklab_to_srgb(lab)
-    assert np.allclose(rgb, back, atol=1e-8)
+    assert np.allclose(rgb, from_space(to_space(rgb)), atol=1e-8)
 
 
 def test_in_gamut_true_for_srgb_primaries():
@@ -78,33 +84,10 @@ def test_in_gamut_scalar_vs_batch():
 
 
 # --- CIELAB (D65) --------------------------------------------------------- #
-# These mirror the Oklab tests above. CIELAB is added to support the
-# Oklab-vs-CIELAB head-to-head in experiments/colour_space/, not as the
-# package's recommended space; the package default remains Oklab.
-
-def test_cielab_round_trip_grid_of_colours():
-    rng = np.random.default_rng(20)
-    rgb = rng.uniform(0.0, 1.0, size=(200, 3))
-    lab = srgb_to_cielab(rgb)
-    back = cielab_to_srgb(lab)
-    assert np.allclose(rgb, back, atol=1e-8)
-
-
-def test_cielab_round_trip_preserves_shape():
-    rng = np.random.default_rng(21)
-    rgb = rng.uniform(0.0, 1.0, size=(8, 5, 3))
-    lab = srgb_to_cielab(rgb)
-    assert lab.shape == rgb.shape
-    back = cielab_to_srgb(lab)
-    assert back.shape == rgb.shape
-
-
-def test_cielab_black_and_white_round_trip():
-    rgb = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
-    lab = srgb_to_cielab(rgb)
-    back = cielab_to_srgb(lab)
-    assert np.allclose(rgb, back, atol=1e-8)
-
+# CIELAB exists to support the Oklab-vs-CIELAB head-to-head in
+# experiments/colour_space/, not as the package's recommended space; the
+# package default remains Oklab. Its round-trip behavior is covered by the
+# parametrized tests above.
 
 def test_cielab_midgray_anchor():
     """Mid-gray sRGB [0.5, 0.5, 0.5] maps to L* ~ 53.39, the standard published D65 value.

@@ -37,7 +37,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .colour import FloatArray
-from .diffusion import _scanlines, nearest_palette_index
+from .diffusion import _scanlines, _validate_inputs, nearest_palette_index
 
 # Floyd-Steinberg causal support, in (row, col) offsets relative to the
 # current pixel. Same four positions the package's DEFAULT_WEIGHTS use.
@@ -162,12 +162,15 @@ def kb_diffuse(
     Raises
     ------
     ValueError
+        If `image_oklab` is not ``(H, W, 3)``, if `palette_oklab` is not
+        ``(n, 3)`` with ``n >= 1``, or if it contains non-finite values.
         If `shaping` is not a single ``(3, 3)`` matrix; per-cell
         ``(n, 3, 3)`` shaping matrices are not supported.
 
     """
     image_oklab = np.asarray(image_oklab, dtype=np.float64)
     palette_oklab = np.asarray(palette_oklab, dtype=np.float64)
+    _validate_inputs(image_oklab, palette_oklab)
     if shaping is not None:
         shaping = np.asarray(shaping, dtype=np.float64)
         if shaping.ndim != 2:

@@ -69,7 +69,8 @@ def test_describe_palette_fully_degenerate_palette():
     division-by-zero.
     """
     palette = np.array([[0.5, 0.0, 0.0], [0.5, 0.0, 0.0]])
-    description = describe_palette(palette, eps=0.02 ** 2)
+    with pytest.warns(UserWarning, match="low-rank"):
+        description = describe_palette(palette, eps=0.02 ** 2)
     assert "almost no measurable spread" in description
 
 
