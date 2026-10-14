@@ -24,6 +24,13 @@ keywords:
   - Python
   - computational design
 license: MIT
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23375116
+    description: "Concept DOI (all versions; always resolves to the latest release)"
+  - type: doi
+    value: 10.5281/zenodo.23375118
+    description: "Zenodo DOI for v0.2.0"
 preferred-citation:
   type: software
   title: "tramage: palette-structure-aware error diffusion dithering"
@@ -34,4 +41,5 @@ preferred-citation:
       affiliation: "Tongji University, College of Design and Innovation"
   version: 0.2.0
   date-released: "2026-10-15"
+  doi: 10.5281/zenodo.23375116
   url: "https://github.com/MichailSemoglou/tramage"

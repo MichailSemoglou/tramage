@@ -1,5 +1,7 @@
 # Tramage
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23375116.svg)](https://doi.org/10.5281/zenodo.23375116)
+
 Tramage is palette-structure-aware error diffusion dithering. Give it an image and a palette, and it dithers as ordinary vector Floyd-Steinberg would, except that the error carried between pixels is first reshaped along the palette’s own geometry in Oklab, computed once per palette, so error is passed through where the palette has real extent and damped where it does not. If your palette is a family of related tones rather than a broad spread of color, and dithered output has always looked grainier or noisier than it should, this is built for that case.
 
 ![Near-degenerate palette: baseline shows visible noise in the center crop that the shaped variants damp](https://raw.githubusercontent.com/MichailSemoglou/tramage/main/gallery/images/near-degenerate.png)
