@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 type: software
 title: "tramage: palette-structure-aware error diffusion dithering"
 version: 0.2.0
-date-released: "2026-10-14"
+date-released: "2026-10-15"
 authors:
   - family-names: Semoglou
     given-names: Michail
@@ -33,5 +33,5 @@ preferred-citation:
       orcid: "https://orcid.org/0009-0003-3268-5657"
       affiliation: "Tongji University, College of Design and Innovation"
   version: 0.2.0
-  date-released: "2026-10-14"
+  date-released: "2026-10-15"
   url: "https://github.com/MichailSemoglou/tramage"

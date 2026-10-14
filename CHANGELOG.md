@@ -4,7 +4,7 @@ All notable changes to tramage are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-## [0.2.0] - 2026-10-14
+## [0.2.0] - 2026-10-15
 
 First public release.
 
