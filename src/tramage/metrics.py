@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 from functools import lru_cache
+from typing import Literal, overload
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -325,6 +326,30 @@ def _filter_opponent(
     raise ValueError(
         f"unknown filters {filters!r}: expected 'zhang1997' or 'gaussian'"
     )
+
+
+@overload
+def scielab_de(
+    dithered: FloatArray,
+    original: FloatArray,
+    dpi: float = 100.0,
+    viewing_distance_cm: float = 40.0,
+    *,
+    full: Literal[False] = False,
+    filters: str = "zhang1997",
+) -> float: ...
+
+
+@overload
+def scielab_de(
+    dithered: FloatArray,
+    original: FloatArray,
+    dpi: float = 100.0,
+    viewing_distance_cm: float = 40.0,
+    *,
+    full: Literal[True],
+    filters: str = "zhang1997",
+) -> dict[str, float]: ...
 
 
 def scielab_de(

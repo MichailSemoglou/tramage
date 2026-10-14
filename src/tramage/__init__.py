@@ -42,7 +42,7 @@ from .shaping import (
 )
 from .swatches import load_ase, load_gpl, load_hex_list, load_swatch
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "srgb_to_oklab",
