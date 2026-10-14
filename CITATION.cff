@@ -1,19 +1,37 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Tramage: palette-structure-aware error diffusion dithering"
 type: software
-version: 0.1.0
-date-released: "2026-07-02"
-url: "https://github.com/MichailSemoglou/tramage"
-repository-code: "https://github.com/MichailSemoglou/tramage"
-license: MIT
+title: "tramage: palette-structure-aware error diffusion dithering"
+version: 0.2.0
+date-released: "2026-10-14"
 authors:
-  - name: "Michail Semoglou"
-    website: "https://qide.studio"
+  - family-names: Semoglou
+    given-names: Michail
+    orcid: "https://orcid.org/0009-0003-3268-5657"
+    affiliation: "Tongji University, College of Design and Innovation"
+repository-code: "https://github.com/MichailSemoglou/tramage"
+url: "https://github.com/MichailSemoglou/tramage"
+abstract: "A Python package for constrained-palette halftoning. Given a continuous-tone image and a small, designer-chosen palette, tramage redistributes the quantization error using the palette's own covariance geometry in Oklab: error is damped along the palette's degenerate directions and left alone where the palette can absorb it. The shaping matrix is closed-form and computed once per palette; dithering costs one 3x3 matrix multiplication per pixel beyond ordinary error diffusion. On a 124-image corpus (Kodak24 + CQ100), it reduces perceptual error (S-CIELAB dE) by a median of up to 21% at small-to-moderate palette sizes and matches or beats the matrix-valued Damera-Venkata prior art in that regime. The package includes the evaluation harness, corpus manifests, and analysis scripts needed to reproduce every reported number."
 keywords:
-  - dithering
   - error diffusion
-  - colour
-  - oklab
-  - palette
+  - color quantization
   - halftoning
+  - palette design
+  - S-CIELAB
+  - Oklab
+  - dithering
+  - perceptual metrics
+  - Python
+  - computational design
+license: MIT
+preferred-citation:
+  type: software
+  title: "tramage: palette-structure-aware error diffusion dithering"
+  authors:
+    - family-names: Semoglou
+      given-names: Michail
+      orcid: "https://orcid.org/0009-0003-3268-5657"
+      affiliation: "Tongji University, College of Design and Innovation"
+  version: 0.2.0
+  date-released: "2026-10-14"
+  url: "https://github.com/MichailSemoglou/tramage"

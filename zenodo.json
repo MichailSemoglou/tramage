@@ -1,0 +1,28 @@
+{
+  "title": "tramage: palette-structure-aware error diffusion dithering",
+  "description": "tramage is a Python package for constrained-palette halftoning: it dithers a continuous-tone image against a small, designer-chosen color palette while steering the quantization error away from the directions the palette cannot represent. The shaping matrix is derived in closed form from the palette's covariance eigenstructure in Oklab, computed once per palette, and costs one 3x3 matrix multiplication per pixel beyond ordinary error diffusion. On a 124-image corpus (Kodak24 + CQ100) at palette sizes K = 8-256, the method reduces perceptual error (S-CIELAB dE) by a median of up to 21% at small-to-moderate palette sizes, and the cheap shaped Floyd-Steinberg matches or beats the matrix-valued Damera-Venkata prior art in that regime. The repository ships the package, the seeded experiment harnesses, the result CSVs, and the analysis scripts needed to reproduce every reported number.",
+  "upload_type": "software",
+  "access_right": "open",
+  "version": "0.2.0",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Semoglou, Michail",
+      "affiliation": "Tongji University, College of Design and Innovation",
+      "orcid": "0009-0003-3268-5657"
+    }
+  ],
+  "keywords": [
+    "error diffusion",
+    "color quantization",
+    "halftoning",
+    "palette design",
+    "S-CIELAB",
+    "Oklab",
+    "dithering",
+    "perceptual metrics",
+    "Python",
+    "computational design"
+  ],
+  "notes": "The GitHub repository (https://github.com/MichailSemoglou/tramage) carries the full experiment harness and corpus manifests. The Kodak Lossless True Color Image Suite and the CQ100 dataset are available from their original public sources; the repository includes scripts that fetch both."
+}
