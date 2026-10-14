@@ -5,7 +5,7 @@
 The epsilon parameter (`eps`) in `tramage.shaping` controls how aggressively
 error is damped along near-degenerate palette axes. This sweep varies it
 across orders of magnitude for a fixed image and palette, producing the
-noise-vs-tone Pareto front that characterises the trade-off.
+noise-vs-tone Pareto front that characterizes the trade-off.
 
 ## What it tests
 
@@ -48,7 +48,7 @@ python experiments/epsilon_sweep/plot_sweep.py
 
 ## Interpretation
 
-This sweep is the empirical backbone of the paper's characterisation
+This sweep is the empirical backbone of the paper's characterization
 section. Running it across multiple palettes and images will answer:
 
 1. Does the optimal eps (Pareto knee) correlate with a palette's eigenvalue
@@ -84,7 +84,7 @@ Findings:
 1. **The headline is qualitatively robust, quantitatively eps-sensitive.**
    The S-CIELAB benefit never changes sign within the tested range, but its
    magnitude at K=16 spans 9–20% across a 16x eps range. The paper states
-   the default's neighbourhood, not just the default.
+   the default's neighborhood, not just the default.
 2. **The default is conservative on Kodak.** Smaller eps gives a *larger*
    S-CIELAB benefit at every K tested, trading away noise reduction for
    tone (noise_L reduction grows with eps while tone_error shrinks and then
@@ -92,5 +92,5 @@ Findings:
    predicts). Whether 0.25x-0.5x is the better default is a real question
    the February manuscript should address, ideally on both corpora.
 3. **eps is an absolute scale, and it shows.** Because the default is not
-   normalised by palette extent, its meaning shifts with K; the corpus
+   normalized by palette extent, its meaning shifts with K; the corpus
    table is the evidence for the disclosure sentence in the paper.

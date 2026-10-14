@@ -166,7 +166,7 @@ as a perceptual benefit of the KB filter above the boundary.
 
 Shaping is a **small-to-moderate-K intervention** (K ≤ 64). That is where
 palette geometry is irregular enough for shaping to have purchase; at
-K = 256, error diffusion into 256 colours is barely doing anything for
+K = 256, error diffusion into 256 colors is barely doing anything for
 anyone (the shaping benefit is 0.0037 of a noise level of ~0.008). The
 interaction ratio is only meaningful where the shaping effect (the
 denominator) is not near zero; absolute interaction is reported alongside
@@ -175,7 +175,7 @@ the ratio throughout.
 ## The stronger baselines
 
 - **KB scalar filter** (kolpatzik1992, Table 1): three independent 4-tap
-  filters, one per opponent channel (Y, rg, yb), minimising perceived error
+  filters, one per opponent channel (Y, rg, yb), minimizing perceived error
   variance under per-channel CSFs. Uses the published coefficients directly.
 - **DV matrix filter** (`tramage.dv_filter`): the full Damera-Venkata matrix
   taps, designed per palette by a closed-form (training-free) Yule-Walker
@@ -193,7 +193,7 @@ primarily on error variance, DV will be understated for the same reason.
 
 ## Disambiguation: this is not Damera-Venkata
 
-Damera-Venkata & Evans' matrix is **optimised against an HVS colour-frequency
+Damera-Venkata & Evans' matrix is **optimized against an HVS color-frequency
 model**: it routes error into the frequencies and opponent channels the eye
 is least sensitive to. The shaping matrix here comes from **palette
 covariance**: it routes error into the directions the palette can actually

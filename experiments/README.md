@@ -66,10 +66,10 @@ globally degenerate enough that the global matrix already captures the
 relevant structure. Per-cell remains in the package as an explored
 extension; this experiment is no longer motivated by the paper's claims.
 
-## Colour-space comparison (done)
+## Color-space comparison (done)
 
 `colour_space/` tests whether Oklab — the package default — is actually
-the right colour space for palette-structure-aware shaping, or whether
+the right color space for palette-structure-aware shaping, or whether
 CIELAB gives shaping more purchase. Adds a `srgb_to_cielab` /
 `cielab_to_srgb` path to `tramage.colour` (D65) for the comparison, then
 runs the same Kodak24 harness with shaping in each space, each compared
@@ -113,7 +113,7 @@ treat this file as superseded.
 ## Damera-Venkata baseline (done, full matrix filter)
 
 `kb_baseline/` tests whether palette-structure-aware shaping still helps
-when the baseline diffusion filter is HVS-optimised rather than plain
+when the baseline diffusion filter is HVS-optimized rather than plain
 Floyd-Steinberg. It runs three filters, each with and without shaping
 (six configurations, 4464 trials): naive Floyd-Steinberg, the scalar
 Kolpatzik-Bouman filter (kolpatzik1992 Table 1, the separable special
@@ -122,7 +122,7 @@ matrix-valued DV filter in its closed-form Oklab redesign
 (`RUN_DV = True`). See
 [`kb_baseline/README.md`](kb_baseline/README.md) for the verdict. In
 short: shaping reduces noise by a median 22–33% on top of the KB filter,
-winning on 124/124 images at every K, so the generalisation claim holds
+winning on 124/124 images at every K, so the generalization claim holds
 at reduced magnitude relative to the FS comparison. The DV analysis
 (`kb_baseline/analyze_dv.py`, S-CIELAB with Wilcoxon signed-rank tests)
 adds three findings. The full matrix filter is the strongest unshaped

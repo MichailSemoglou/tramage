@@ -1,4 +1,4 @@
-# Colour-space head-to-head: Oklab vs CIELAB
+# Color-space head-to-head: Oklab vs CIELAB
 
 The package defaults to Oklab for palette-structure-aware shaping, on the
 assertion that Oklab's superior perceptual uniformity makes its covariance
@@ -26,7 +26,7 @@ across spaces.
 
 ## The fair comparison
 
-The metrics are computed in the colour space the dithering was done in.
+The metrics are computed in the color space the dithering was done in.
 That means **absolute values are not comparable between Oklab and CIELAB**
 — CIELAB L* ranges 0–100, Oklab L is roughly 0–1, so a CIELAB noise of
 3.0 and an Oklab noise of 0.03 are similar magnitudes for similar work.
@@ -55,10 +55,10 @@ here for transparency rather than edited out.
 
 The fix used in the present run: `eps` is set **per palette** to a fixed
 fraction of that palette's largest eigenvalue, so the gain threshold
-adapts to the colour space's scale automatically. An axis counts as
+adapts to the color space's scale automatically. An axis counts as
 "flat" if its variance is below the same fraction of the dominant axis,
 regardless of units. The calibration target is that on a typical Kodak
-Oklab palette, this reproduces the package default's behaviour. The
+Oklab palette, this reproduces the package default's behavior. The
 actual `eps` used per trial is recorded in the CSV's `eps` column.
 
 ## Configuration
@@ -174,5 +174,5 @@ Three findings:
   as a methodological note: it illustrates why corpus-scale evaluation
   matters and pre-empts a reviewer's "did you check more than one image?"
 - The CIELAB tone advantage is worth one sentence, not a section: it
-  exists, it favours CIELAB, and it sits in the large-K regime where
+  exists, it favors CIELAB, and it sits in the large-K regime where
   shaping's overall benefit is already declining.

@@ -160,7 +160,7 @@ Test: regress post-shaping `lowfreq_frac` on log(condition number); then add
 image index as a factor and compare R². If image identity contributes no
 explanatory power beyond the condition number, the positive form holds:
 post-shaping lowfreq is palette-determined, not image-determined. Eigenvalue
-spread and nearest-neighbour spacing are reported as exploratory checks only,
+spread and nearest-neighbor spacing are reported as exploratory checks only,
 not as pre-specified predictors.
 
 ## Amendment D — fixed-palette experiment readout (19 Aug, 18:27–18:28)

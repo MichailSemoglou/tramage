@@ -2,18 +2,18 @@
 
 ## The short version
 
-Dithering trades colours you do not have for a pattern of colours you do
-have, arranged so that, at a glance, they read as the colour you wanted.
+Dithering trades colors you do not have for a pattern of colors you do
+have, arranged so that, at a glance, they read as the color you wanted.
 Classic error diffusion (Floyd-Steinberg and its relatives) does this by a
-simple rule: pick the nearest available colour, then hand the leftover
+simple rule: pick the nearest available color, then hand the leftover
 difference to the next pixel, so the running average stays honest. That
 rule does not ask what kind of palette it is working with. Tramage does ask,
 and the answer changes where the leftover difference is allowed to go.
 
 ## A palette is a shape, not just a list
 
-Three brand colours are not just three swatches. Plotted in a perceptual
-colour space, they form a shape: a triangle, most often, sitting somewhere
+Three brand colors are not just three swatches. Plotted in a perceptual
+color space, they form a shape: a triangle, most often, sitting somewhere
 in the space of everything the eye can distinguish. That shape has a size
 and an orientation. Some palettes are broad and roughly ball-shaped: warm to
 cool, light to dark, saturated to muted, with real room in every direction.
@@ -22,7 +22,7 @@ which might vary a great deal in lightness but hardly at all in the
 direction that separates warm from cool.
 
 This matters because of what happens when a photograph or gradient asks for
-a colour the palette does not have. The classic algorithm computes the gap
+a color the palette does not have. The classic algorithm computes the gap
 between what was wanted and what was used, then posts that whole gap onward
 as debt for nearby pixels to repay. If the gap happens to point in a
 direction the palette has no room in at all, that debt can never be repaid.
@@ -34,8 +34,8 @@ and everything to do with the arithmetic.
 ## What shaping does instead
 
 Before dithering starts, tramage looks at the palette’s own shape: its
-spread along every direction in Oklab, a colour space built so that
-distance corresponds reasonably well to how different two colours actually
+spread along every direction in Oklab, a color space built so that
+distance corresponds reasonably well to how different two colors actually
 look. Directions where the palette has real extent are left alone, debt
 posted along them is real and repayable, so it passes through unchanged.
 Directions where the palette is flat, or nearly flat, are damped. The
@@ -47,14 +47,14 @@ the palette can never use, and instead shows up, if it shows up at all, as
 finer, quieter noise rather than slow drift. The gallery’s near-degenerate
 comparison (see gallery/README.md) shows this directly: the same image, the
 same palette, dithered with and without shaping, with the shaped version
-visibly calmer in the centre crop.
+visibly calmer in the center crop.
 
 ## What this does not do
 
-It does not invent colours the palette lacks. A photograph’s sunset will
+It does not invent colors the palette lacks. A photograph’s sunset will
 not gain an orange your brand palette does not contain. What changes is
 narrower and more honest than that: where the unavoidable noise from
-approximating that sunset is allowed to sit. Given a colour the palette
+approximating that sunset is allowed to sit. Given a color the palette
 cannot represent, tramage decides whether the resulting noise is spread
 finely (usually less noticeable) or left to accumulate as drift (usually
 more noticeable). It cannot repay a debt the palette has no means to repay;

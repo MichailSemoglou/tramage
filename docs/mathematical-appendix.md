@@ -1,19 +1,19 @@
 # Mathematical appendix
 
 This is the proof underneath docs/for-designers.md. It assumes familiarity
-with error diffusion, nearest-neighbour quantisation, and basic linear
+with error diffusion, nearest-neighbor quantization, and basic linear
 algebra.
 
 ## Setup
 
 Let $P = \{p_1, \dots, p_n\} \subset \mathbb{R}^3$ be a palette in Oklab.
-Nearest-neighbour quantisation of a point $x$ is
+Nearest-neighbor quantization of a point $x$ is
 
 $$q(x) = \arg\min_i \lVert x - p_i \rVert^2.$$
 
 Vector error diffusion propagates the error $e = x - p_{q(x)}$ to
-neighbouring pixels by adding a weighted share of it to their running
-values before they are quantised in turn. This package instead propagates
+neighboring pixels by adding a weighted share of it to their running
+values before they are quantized in turn. This package instead propagates
 $e’ = Me$, where $M$ is built once per palette (see below), and reduces to
 ordinary error diffusion when $M = I$.
 
@@ -34,7 +34,7 @@ $$M = V \, \mathrm{diag}\bigl(g(\lambda_1), g(\lambda_2), g(\lambda_3)\bigr) \, 
 
 $M$ is symmetric, positive semi-definite, and every eigenvalue $g(\lambda_i)$
 lies in $[0, 1)$. It acts as identity along directions where $\lambda_i \gg
-\varepsilon$ and as a projection towards zero along directions where
+\varepsilon$ and as a projection toward zero along directions where
 $\lambda_i \ll \varepsilon$. This is the same shrinkage form used in ridge
 regression and Wiener filtering: $\varepsilon$ plays the role of a noise
 floor, and only the share of variance exceeding it is treated as real
@@ -43,17 +43,17 @@ smallest variance worth protecting error along.
 
 Two conventions matter for reproducing the numbers. First, $\varepsilon$ is
 an *absolute* scale in Oklab-variance units (the default, $0.02^2$, is used
-unchanged across the corpus runs); it is not normalised by palette extent,
+unchanged across the corpus runs); it is not normalized by palette extent,
 so the same $\varepsilon$ damps a narrow palette more than a wide one.
 Second, $\Sigma$ is the unweighted population covariance over the palette
-colours ($1/n$ divisor, no share weighting): a colour covering half the
+colors ($1/n$ divisor, no share weighting): a color covering half the
 image shapes $M$ no more than one covering a fraction of a percent. The
 corpus-scale sensitivity of the headline numbers to $\varepsilon$ is
 measured in `experiments/epsilon_sweep/` (the corpus sweep).
 
 The per-cell variant applies the same construction locally: for palette
-colour $p_i$, its $k$ nearest palette neighbours (a robust stand-in for a
-Delaunay neighbourhood, which degenerates for rank-deficient palettes) give
+color $p_i$, its $k$ nearest palette neighbors (a robust stand-in for a
+Delaunay neighborhood, which degenerates for rank-deficient palettes) give
 a local covariance and a local matrix $M_i$, rather than one matrix for the
 whole palette. This variant is exported but is **not the recommended
 method**: on a 124-image corpus run (see `experiments/dithering_quality/`)
@@ -73,7 +73,7 @@ and every pair $p_i, p_j \in P$,
 $$\lVert (x + e^\perp) - p_i \rVert^2 - \lVert (x + e^\perp) - p_j \rVert^2 = \lVert x - p_i \rVert^2 - \lVert x - p_j \rVert^2.$$
 
 Consequently $q(x + e^\perp) = q(x)$: adding $e^\perp$ can never change which
-palette colour is nearest.
+palette color is nearest.
 
 **Proof.** Expand each squared distance:
 
@@ -87,7 +87,7 @@ Since $p_i, p_j \in A$, the difference $p_j - p_i$ lies in the direction of
 $A$, and $e^\perp$ is orthogonal to that direction by hypothesis, so $e^\perp
 \cdot (p_j - p_i) = 0$. The extra term vanishes, proving the identity. Since
 this holds for every pair $(p_i, p_j)$, the ordering of distances to every
-palette colour is unchanged by adding $e^\perp$, so the arg min is
+palette color is unchanged by adding $e^\perp$, so the arg min is
 unchanged. $\blacksquare$
 
 **Consequence for shaping.** If $P$ is exactly rank-deficient, its
@@ -96,7 +96,7 @@ orthogonal to its affine hull, so $g(0) = 0/(0+\varepsilon) = 0$ exactly,
 for any $\varepsilon > 0$. $M$ therefore annihilates that direction
 completely rather than merely damping it. The lemma above shows this
 changes nothing that could have mattered: propagating the raw orthogonal
-error and propagating none of it lead to identical quantisation decisions
+error and propagating none of it lead to identical quantization decisions
 at every pixel, since neither can ever change an argmin. Shaping is
 provably inert here, not approximately so. This is confirmed end to end in
 `tests/test_diffusion.py`: baseline and shaped diffusion produce bit-for-bit
@@ -139,7 +139,7 @@ fidelity retained), smaller values approach the unshaped baseline. See
 
 ## A real photograph
 
-On a photograph with a ten-colour palette extracted by k-means clustering
+On a photograph with a ten-color palette extracted by k-means clustering
 in Oklab, the extracted palette turned out to be naturally close to
 one-dimensional, with covariance eigenvalues of approximately $1 \times
 10^{-6}$, $1.1 \times 10^{-4}$, and $4.1 \times 10^{-2}$: two axes nearly

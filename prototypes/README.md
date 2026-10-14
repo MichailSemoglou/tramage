@@ -11,7 +11,7 @@ these as notebooks, not as an interface.
 ## Files
 
 - `palette_aware_dither.py`: the original prototype and evaluation. Builds a
-  deliberately rank-deficient palette (nine colours on a single plane in
+  deliberately rank-deficient palette (nine colors on a single plane in
   Oklab), diffuses a test image against it under three variants (vector
   Floyd-Steinberg, global-covariance shaping, per-cell shaping), and reports
   bias, tone error, noise, and spectral measures for each. This is where the
@@ -20,7 +20,7 @@ these as notebooks, not as an interface.
   the plane, so it is close to rank-deficient rather than exactly so. This is
   the pathological case: shaping becomes a fidelity-versus-noise trade-off
   rather than a free improvement, and the eigenvalue floor `eps` is the knob.
-- `photo_pipeline.py`: the real-photograph test. Extracts a ten-colour
+- `photo_pipeline.py`: the real-photograph test. Extracts a ten-color
   palette from a photograph by k-means clustering in Oklab (which turns out
   to be naturally near-one-dimensional), then runs the same three-way
   comparison.

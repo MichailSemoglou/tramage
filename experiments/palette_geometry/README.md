@@ -10,7 +10,7 @@ pulled forward into Phase 1 as the cheapest, highest-value evidence:
 This folder answers that question with data. No new method code is
 exercised: every function called here is part of `tramage`'s public API,
 unchanged from the package release. The output is a CSV of eigenstructure
-per extracted palette and two figures summarising it.
+per extracted palette and two figures summarizing it.
 
 ## What this measures
 

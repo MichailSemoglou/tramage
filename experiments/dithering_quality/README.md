@@ -16,8 +16,8 @@ For each `(image, K)` trial, three dithers are produced and scored:
 - **baseline** — `shaping=None` (vector Floyd-Steinberg).
 - **global** — one shaping matrix from the whole palette's covariance,
   via `tramage.shaping.global_shaping_matrix`.
-- **cell** — one matrix per palette colour, from its k=4 nearest
-  neighbours, via `tramage.shaping.per_cell_shaping_matrices`.
+- **cell** — one matrix per palette color, from its k=4 nearest
+  neighbors, via `tramage.shaping.per_cell_shaping_matrices`.
 
 The shaping matrices are built at `eps = tramage.shaping.DEFAULT_EPS`
 (`0.02²`), the same value the geometry experiment and the package
@@ -41,7 +41,7 @@ using `tramage.metrics`:
   designed to suppress.
 - **Spectral anisotropy** (`spectral_anisotropy`, L channel) — directional
   non-uniformity of the mid-band error spectrum. Detects scan-direction
-  artefacts.
+  artifacts.
 
 Systematic bias is recorded for completeness (the part of the error no
 amount of redistribution within the affine hull can change), but the
@@ -130,7 +130,7 @@ is the trade-off the mathematical appendix predicted: damping error along
 the palette's flat direction reduces noise but sacrifices whatever
 information the image was asking of that direction. At small K the
 sacrifice is invisible (the palette can't represent that direction
-anyway); at large K the palette has enough colours to begin
+anyway); at large K the palette has enough colors to begin
 representing it, and damping becomes a real cost.
 
 **Low-frequency error fraction** (median across the 24 Kodak images; lower
@@ -174,7 +174,7 @@ S-CIELAB while still helping CQ100. The pooled significance at K=64–128
 is carried by CQ100, and the pooled K=256 null (sign p = 0.53; Wilcoxon
 p = 0.15) hides uniform Kodak harm (0/24 wins) against a real CQ100
 gain (median +3.3%). Mean and median diverge at K=256 (mean −1.8% vs
-median +1.2%): a skewed mix of two subgroup behaviours, not a homogeneous
+median +1.2%): a skewed mix of two subgroup behaviors, not a homogeneous
 small effect. The paper reports this split wherever it reports the
 pooled curve.
 
@@ -187,12 +187,12 @@ plainly:
    in L-channel noise, consistent on every image at every K, is the
    headline result. The synthetic-gallery finding from
    `docs/mathematical-appendix.md` (3.1× lower lightness noise on one
-   photograph) generalises: across Kodak24 the median reduction is
+   photograph) generalizes: across Kodak24 the median reduction is
    2.2–2.8×.
 
 2. **The trade-off the appendix predicted is real and quantified.** At
    K ≤ 64 the trade is free — shaping wins noise without losing tone. At
-   K ≥ 128 the palette has enough colours to start representing the
+   K ≥ 128 the palette has enough colors to start representing the
    formerly-flat direction, and damping it costs ~5–20% blurred-tone
    error. This gives the paper an honest scope statement: the method is
    a noise-reduction tool for small-to-mid palettes (the designer
@@ -233,5 +233,5 @@ hypothesis predicted, and it is what the data says.
   load-bearing, not less: the small-K regime where shaping is a free
   improvement *is* the designer regime.
 - The ROADMAP Phase 3 "epsilon sweep" and "clustered-palette test"
-  remain useful characterisation work, but the per-cell question they
+  remain useful characterization work, but the per-cell question they
   were partly aimed at is now answered.
